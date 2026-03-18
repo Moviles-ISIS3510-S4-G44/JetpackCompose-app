@@ -1,0 +1,17 @@
+# Android
+build/
+app/build/
+.gradle/
+local.properties
+*.iml
+.idea/
+
+# Unit test reports
+app/build/reports/
+app/build/test-results/
+
+# Other
+.DS_Store
+captures/
+.externalNativeBuild/
+.cxx/
