@@ -1,16 +1,16 @@
 package com.university.marketplace.ui.home
 
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
-import com.university.marketplace.data.FakeProductRepository
+import androidx.lifecycle.ViewModelProvider
+import com.university.marketplace.data.ProductRepository
 import com.university.marketplace.domain.Product
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.launch
 
-class HomeViewModel : ViewModel() {
-    private val repository = FakeProductRepository()
+class HomeViewModel(
+    private val repository: ProductRepository
+) : ViewModel() {
 
     private val _products = MutableStateFlow<List<Product>>(emptyList())
     val products: StateFlow<List<Product>> = _products.asStateFlow()
@@ -33,3 +33,17 @@ class HomeViewModel : ViewModel() {
         println("Analytics: User searched for $query")
     }
 }
+
+@Suppress("unused")
+class HomeViewModelFactory(
+    private val repository: ProductRepository
+) : ViewModelProvider.Factory {
+    @Suppress("UNCHECKED_CAST")
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        if (modelClass.isAssignableFrom(HomeViewModel::class.java)) {
+            return HomeViewModel(repository) as T
+        }
+        throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
+    }
+}
+
