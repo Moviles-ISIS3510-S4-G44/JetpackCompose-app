@@ -13,6 +13,7 @@ import com.university.marketplace.ui.theme.JetpackComposeAppTheme
 import com.university.marketplace.data.FakeProductRepository
 import androidx.navigation.NavType
 import androidx.navigation.navArgument
+import com.university.marketplace.ui.home.CreateListingScreen
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -31,13 +32,18 @@ fun AppNavigation() {
     val repository = FakeProductRepository()
 
     NavHost(navController = navController, startDestination = "home") {
+        // Home
         composable("home") {
             HomeMarketplaceScreen(
                 onNavigateToMap = { product ->
                     navController.navigate("map/${product.id}")
+                },
+                onNavigateToSell = {
+                    navController.navigate("create_listing")
                 }
             )
         }
+        // Map
         composable(
             route = "map/{productId}",
             arguments = listOf(navArgument("productId") { type = NavType.StringType })
@@ -51,6 +57,10 @@ fun AppNavigation() {
                     onBack = { navController.popBackStack() }
                 )
             }
+        }
+        // Sell
+        composable("create_listing") {
+            CreateListingScreen ({ navController.popBackStack() })
         }
     }
 }

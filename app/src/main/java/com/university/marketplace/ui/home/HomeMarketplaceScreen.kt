@@ -37,6 +37,7 @@ import com.university.marketplace.ui.theme.MarketplaceWhite
 @Composable
 fun HomeMarketplaceScreen(
     onNavigateToMap: (Product) -> Unit,
+    onNavigateToSell: () -> Unit,
     viewModel: HomeViewModel = viewModel()
 ) {
     val products by viewModel.products.collectAsState()
@@ -44,7 +45,9 @@ fun HomeMarketplaceScreen(
     val categories = listOf("Books", "Electronics", "Furniture", "Study")
 
     Scaffold(
-        bottomBar = { MarketplaceBottomNavigation() }
+        bottomBar = { MarketplaceBottomNavigation(
+            onSellClick = onNavigateToSell
+        ) }
     ) { padding ->
         LazyColumn(
             modifier = Modifier
@@ -61,7 +64,7 @@ fun HomeMarketplaceScreen(
                         color = MarketplaceDark
                     )
                     Spacer(modifier = Modifier.height(16.dp))
-                    
+
                     // Search Bar
                     TextField(
                         value = searchQuery,
@@ -80,9 +83,9 @@ fun HomeMarketplaceScreen(
                         ),
                         singleLine = true
                     )
-                    
+
                     Spacer(modifier = Modifier.height(16.dp))
-                    
+
                     // Categories
                     LazyRow(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -119,7 +122,7 @@ fun HomeMarketplaceScreen(
             item {
                 SectionHeader(title = "Recent Listings", onSeeAllClick = {})
             }
-            
+
             items(products.filter { !it.isFeatured }.chunked(2)) { pair ->
                 Row(
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
@@ -127,7 +130,7 @@ fun HomeMarketplaceScreen(
                 ) {
                     pair.forEach { product ->
                         RecentProductCard(
-                            product = product, 
+                            product = product,
                             modifier = Modifier.weight(1f),
                             onClick = { onNavigateToMap(product) }
                         )
@@ -137,7 +140,7 @@ fun HomeMarketplaceScreen(
                     }
                 }
             }
-            
+
             item { Spacer(modifier = Modifier.height(16.dp)) }
         }
     }
@@ -154,8 +157,8 @@ fun SectionHeader(title: String, onSeeAllClick: () -> Unit) {
     ) {
         Text(text = title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
         Text(
-            text = "See all", 
-            style = MaterialTheme.typography.bodyMedium, 
+            text = "See all",
+            style = MaterialTheme.typography.bodyMedium,
             color = Color.Gray,
             modifier = Modifier.clickable { onSeeAllClick() }
         )
@@ -246,7 +249,7 @@ fun RecentProductCard(product: Product, modifier: Modifier = Modifier, onClick: 
 }
 
 @Composable
-fun MarketplaceBottomNavigation() {
+fun MarketplaceBottomNavigation(onSellClick: () -> Unit) {
     NavigationBar(
         containerColor = MarketplaceWhite,
         tonalElevation = 8.dp
@@ -258,12 +261,12 @@ fun MarketplaceBottomNavigation() {
             BottomNavItem("Messages", Icons.Filled.ChatBubble, Icons.Outlined.ChatBubbleOutline),
             BottomNavItem("Profile", Icons.Filled.Person, Icons.Outlined.PersonOutline)
         )
-        
+
         var selectedItem by remember { mutableStateOf(0) }
 
         items.forEachIndexed { index, item ->
             NavigationBarItem(
-                icon = { 
+                icon = {
                     if (selectedItem == index) {
                         Surface(
                             color = MarketplaceYellow.copy(alpha = 0.2f),
@@ -277,7 +280,12 @@ fun MarketplaceBottomNavigation() {
                 },
                 label = { Text(item.title, fontSize = 10.sp) },
                 selected = selectedItem == index,
-                onClick = { selectedItem = index },
+                onClick = { selectedItem = index
+                          if (item.title == "Sell") {
+                              onSellClick()
+                          }
+
+                          },
                 colors = NavigationBarItemDefaults.colors(
                     selectedIconColor = MarketplaceDark,
                     unselectedIconColor = Color.Gray,
