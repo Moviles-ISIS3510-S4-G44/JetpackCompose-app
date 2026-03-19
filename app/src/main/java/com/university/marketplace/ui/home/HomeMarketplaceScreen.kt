@@ -21,7 +21,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.university.marketplace.domain.Product
 import com.university.marketplace.ui.theme.MarketplaceYellow
@@ -33,7 +32,7 @@ import com.university.marketplace.ui.theme.MarketplaceWhite
 @Composable
 fun HomeMarketplaceScreen(
     onNavigateToMap: (Product) -> Unit,
-    viewModel: HomeViewModel = viewModel()
+    viewModel: HomeViewModel
 ) {
     val products by viewModel.products.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()

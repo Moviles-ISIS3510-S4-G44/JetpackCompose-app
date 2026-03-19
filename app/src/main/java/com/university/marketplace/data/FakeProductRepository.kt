@@ -2,7 +2,7 @@ package com.university.marketplace.data
 
 import com.university.marketplace.domain.Product
 
-class FakeProductRepository {
+class FakeProductRepository : ProductRepository {
     private val products = listOf(
         Product(
             id = "1",
@@ -71,13 +71,13 @@ class FakeProductRepository {
         )
     )
 
-    fun getProducts(): List<Product> = products
+    override fun getProducts(): List<Product> = products
     
-    fun getFeaturedProducts(): List<Product> = products.filter { it.isFeatured }
+    override fun getFeaturedProducts(): List<Product> = products.filter { it.isFeatured }
     
-    fun getRecentProducts(): List<Product> = products.filter { !it.isFeatured }
+    override fun getRecentProducts(): List<Product> = products.filter { !it.isFeatured }
 
-    fun searchProducts(query: String): List<Product> {
+    override fun searchProducts(query: String): List<Product> {
         if (query.isBlank()) return products
 
         val normalizedQuery = query.normalizeForSearch()
@@ -95,6 +95,8 @@ class FakeProductRepository {
             )
             .map { it.first }
     }
+
+    override fun getProductById(productId: String): Product? = products.find { it.id == productId }
 
     private fun Product.calculateRelevance(normalizedQuery: String, terms: List<String>): Double {
         val normalizedName = name.normalizeForSearch()
