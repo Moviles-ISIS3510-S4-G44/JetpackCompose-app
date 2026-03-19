@@ -5,11 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -41,6 +37,7 @@ fun HomeMarketplaceScreen(
 ) {
     val products by viewModel.products.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
+    val isSearching = searchQuery.isNotBlank()
     val categories = listOf("Books", "Electronics", "Furniture", "Study")
 
     Scaffold(
@@ -102,38 +99,73 @@ fun HomeMarketplaceScreen(
                 }
             }
 
-            // Featured Section
-            item {
-                SectionHeader(title = "Featured", onSeeAllClick = {})
-                LazyRow(
-                    contentPadding = PaddingValues(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    items(products.filter { it.isFeatured }) { product ->
-                        FeaturedProductCard(product, onClick = { onNavigateToMap(product) })
-                    }
+            if (isSearching) {
+                item {
+                    SectionHeader(title = "Resultados", onSeeAllClick = {})
                 }
-            }
 
-            // Recent Listings Section
-            item {
-                SectionHeader(title = "Recent Listings", onSeeAllClick = {})
-            }
-            
-            items(products.filter { !it.isFeatured }.chunked(2)) { pair ->
-                Row(
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    pair.forEach { product ->
-                        RecentProductCard(
-                            product = product, 
-                            modifier = Modifier.weight(1f),
-                            onClick = { onNavigateToMap(product) }
+                if (products.isEmpty()) {
+                    item {
+                        Text(
+                            text = "No encontramos productos para '$searchQuery'",
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Color.Gray
                         )
                     }
-                    if (pair.size == 1) {
-                        Spacer(modifier = Modifier.weight(1f))
+                } else {
+                    items(products.chunked(2)) { pair ->
+                        Row(
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            pair.forEach { product ->
+                                RecentProductCard(
+                                    product = product,
+                                    modifier = Modifier.weight(1f),
+                                    onClick = { onNavigateToMap(product) }
+                                )
+                            }
+                            if (pair.size == 1) {
+                                Spacer(modifier = Modifier.weight(1f))
+                            }
+                        }
+                    }
+                }
+            } else {
+                // Featured Section
+                item {
+                    SectionHeader(title = "Featured", onSeeAllClick = {})
+                    LazyRow(
+                        contentPadding = PaddingValues(horizontal = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        items(products.filter { it.isFeatured }) { product ->
+                            FeaturedProductCard(product, onClick = { onNavigateToMap(product) })
+                        }
+                    }
+                }
+
+                // Recent Listings Section
+                item {
+                    SectionHeader(title = "Recent Listings", onSeeAllClick = {})
+                }
+
+                items(products.filter { !it.isFeatured }.chunked(2)) { pair ->
+                    Row(
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        pair.forEach { product ->
+                            RecentProductCard(
+                                product = product,
+                                modifier = Modifier.weight(1f),
+                                onClick = { onNavigateToMap(product) }
+                            )
+                        }
+                        if (pair.size == 1) {
+                            Spacer(modifier = Modifier.weight(1f))
+                        }
                     }
                 }
             }
