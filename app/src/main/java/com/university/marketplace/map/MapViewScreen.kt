@@ -1,6 +1,7 @@
 package com.university.marketplace.map
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -26,7 +27,8 @@ import com.university.marketplace.ui.theme.*
 @Composable
 fun MapViewScreen(
     product: Product,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onNavigateToDetail: (String) -> Unit
 ) {
     val productLocation = LatLng(product.latitude, product.longitude)
     val cameraPositionState = rememberCameraPositionState {
@@ -77,7 +79,8 @@ fun MapViewScreen(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .padding(16.dp)
-                    .fillMaxWidth(),
+                    .fillMaxWidth()
+                    .clickable{onNavigateToDetail(product.id)},
                 shape = RoundedCornerShape(24.dp),
                 colors = CardDefaults.cardColors(containerColor = MarketplaceWhite),
                 elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)

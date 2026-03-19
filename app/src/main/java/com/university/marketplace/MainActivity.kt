@@ -14,6 +14,7 @@ import com.university.marketplace.data.FakeProductRepository
 import androidx.navigation.NavType
 import androidx.navigation.navArgument
 import com.university.marketplace.ui.home.CreateListingScreen
+import com.university.marketplace.ui.home.ProductDetailScreen
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -50,17 +51,35 @@ fun AppNavigation() {
         ) { backStackEntry ->
             val productId = backStackEntry.arguments?.getString("productId")
             val product = repository.getProducts().find { it.id == productId }
-            
+
             if (product != null) {
                 MapViewScreen(
                     product = product,
-                    onBack = { navController.popBackStack() }
+                    onBack = { navController.popBackStack() },
+                    onNavigateToDetail = { productId ->
+                        navController.navigate("product_detail/$productId")
+                    }
                 )
             }
         }
         // Sell
         composable("create_listing") {
-            CreateListingScreen ({ navController.popBackStack() })
+            CreateListingScreen({ navController.popBackStack() })
+        }
+        // Detail Product
+        composable(
+            route = "product_detail/{productId}",
+            arguments = listOf(navArgument("productId") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val productId = backStackEntry.arguments?.getString("productId")
+            val product = repository.getProducts().find { it.id == productId }
+
+            if (product != null) {
+                ProductDetailScreen(
+                    product = product,
+                    onBack = { navController.popBackStack() }
+                )
+            }
         }
     }
 }
