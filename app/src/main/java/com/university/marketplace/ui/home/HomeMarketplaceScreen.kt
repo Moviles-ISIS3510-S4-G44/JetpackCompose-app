@@ -30,6 +30,8 @@ import com.university.marketplace.ui.theme.MarketplaceWhite
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeMarketplaceScreen(
+    onNavigateToProfile: () -> Unit,
+    onNavigateToMap: (Product) -> Unit,
     onNavigateToDetail: (String) -> Unit,
     onNavigateToSell: () -> Unit,
     viewModel: HomeViewModel
@@ -40,9 +42,16 @@ fun HomeMarketplaceScreen(
     val categories = listOf("Books", "Electronics", "Furniture", "Study")
 
     Scaffold(
-        bottomBar = { MarketplaceBottomNavigation(
-            onSellClick = onNavigateToSell
-        ) }
+        bottomBar = {
+            MarketplaceBottomNavigation(
+                currentRoute = "home",
+                onNavigate = { route ->
+                    if (route == "profile") {
+                        onNavigateToProfile()
+                    }
+                }
+            )
+        }
     ) { padding ->
         Column(
             modifier = Modifier
@@ -280,25 +289,29 @@ fun RecentProductCard(listing: ListingUiModel, modifier: Modifier = Modifier, on
 }
 
 @Composable
-fun MarketplaceBottomNavigation(onSellClick: () -> Unit) {
+fun MarketplaceBottomNavigation(
+    currentRoute: String,
+    onNavigate: (String) -> Unit
+) {
     NavigationBar(
         containerColor = MarketplaceWhite,
         tonalElevation = 8.dp
     ) {
         val items = listOf(
-            BottomNavItem("Home", Icons.Filled.Home, Icons.Outlined.Home),
+            BottomNavItem("Home", Icons.Filled.Home, Icons.Outlined.Home, route = "home"),
             BottomNavItem("Search", Icons.Filled.Search, Icons.Outlined.Search),
             BottomNavItem("Sell", Icons.Filled.Add, Icons.Outlined.Add),
             BottomNavItem("Messages", Icons.Filled.ChatBubble, Icons.Outlined.ChatBubbleOutline),
-            BottomNavItem("Profile", Icons.Filled.Person, Icons.Outlined.PersonOutline)
+            BottomNavItem("Profile", Icons.Filled.Person, Icons.Outlined.PersonOutline, route = "profile")
         )
 
         var selectedItem by remember { mutableStateOf(0) }
 
-        items.forEachIndexed { index, item ->
+        items.forEach { item ->
+            val selected = item.route == currentRoute
             NavigationBarItem(
-                icon = {
-                    if (selectedItem == index) {
+                icon = { 
+                    if (selected) {
                         Surface(
                             color = MarketplaceYellow.copy(alpha = 0.2f),
                             shape = RoundedCornerShape(12.dp)
@@ -310,6 +323,10 @@ fun MarketplaceBottomNavigation(onSellClick: () -> Unit) {
                     }
                 },
                 label = { Text(item.title, fontSize = 10.sp) },
+                selected = selected,
+                onClick = {
+                    item.route?.let(onNavigate)
+                },
                 selected = selectedItem == index,
                 onClick = { selectedItem = index
                           if (item.title == "Sell") {
@@ -327,4 +344,9 @@ fun MarketplaceBottomNavigation(onSellClick: () -> Unit) {
     }
 }
 
-data class BottomNavItem(val title: String, val selectedIcon: ImageVector, val unselectedIcon: ImageVector)
+data class BottomNavItem(
+    val title: String,
+    val selectedIcon: ImageVector,
+    val unselectedIcon: ImageVector,
+    val route: String? = null
+)
