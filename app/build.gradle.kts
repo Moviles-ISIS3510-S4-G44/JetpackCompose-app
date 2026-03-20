@@ -90,6 +90,12 @@ dependencies {
     // Image Loading
     implementation("io.coil-kt:coil-compose:2.7.0")
 
+    // Networking
+    implementation("com.squareup.retrofit2:retrofit:2.11.0")
+    implementation("com.squareup.retrofit2:converter-moshi:2.11.0")
+    implementation("com.squareup.moshi:moshi-kotlin:1.15.1")
+    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
+
     implementation("com.google.maps.android:maps-compose:6.1.0")
     implementation("com.google.android.gms:play-services-maps:19.0.0")
     implementation("com.google.android.gms:play-services-location:21.3.0")
