@@ -30,14 +30,16 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun AppNavigation() {
     val navController = rememberNavController()
+    // Keeping this for other screens that still use the domain Product model for now
     val repository = FakeProductRepository()
 
     NavHost(navController = navController, startDestination = "home") {
         // Home
         composable("home") {
             HomeMarketplaceScreen(
-                onNavigateToMap = { product ->
-                    navController.navigate("map/${product.id}")
+                onNavigateToDetail = { productId ->
+                    // Existing navigation was to map, keeping it as requested
+                    navController.navigate("map/$productId")
                 },
                 onNavigateToSell = {
                     navController.navigate("create_listing")
@@ -50,14 +52,13 @@ fun AppNavigation() {
             arguments = listOf(navArgument("productId") { type = NavType.StringType })
         ) { backStackEntry ->
             val productId = backStackEntry.arguments?.getString("productId")
-            val product = repository.getProducts().find { it.id == productId }
 
-            if (product != null) {
+            if (productId != null) {
                 MapViewScreen(
-                    product = product,
+                    productId = productId,
                     onBack = { navController.popBackStack() },
-                    onNavigateToDetail = { productId ->
-                        navController.navigate("product_detail/$productId")
+                    onNavigateToDetail = { id ->
+                        navController.navigate("product_detail/$id")
                     }
                 )
             }
@@ -72,11 +73,10 @@ fun AppNavigation() {
             arguments = listOf(navArgument("productId") { type = NavType.StringType })
         ) { backStackEntry ->
             val productId = backStackEntry.arguments?.getString("productId")
-            val product = repository.getProducts().find { it.id == productId }
 
-            if (product != null) {
+            if (productId != null) {
                 ProductDetailScreen(
-                    product = product,
+                    productId = productId,
                     onBack = { navController.popBackStack() }
                 )
             }
