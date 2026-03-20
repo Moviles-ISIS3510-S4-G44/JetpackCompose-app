@@ -1,3 +1,4 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import java.util.Properties
 
 plugins {
@@ -13,6 +14,11 @@ if (secretsFile.exists()) {
         secretsProperties.load(input)
     }
 }
+
+val apiBaseUrl =
+    secretsProperties.getProperty("API_BASE_URL")
+        ?: (project.findProperty("API_BASE_URL") as String?)
+        ?: "http://172.17.0.1:8000/"
 
 android {
     namespace = "com.university.marketplace"
@@ -34,6 +40,8 @@ android {
             secretsProperties.getProperty("MAPS_API_KEY")
                 ?: (project.findProperty("MAPS_API_KEY") as String?)
                 ?: "YOUR_MAPS_API_KEY"
+
+        buildConfigField("String", "API_BASE_URL", "\"$apiBaseUrl\"")
     }
 
     buildTypes {
@@ -51,18 +59,21 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlinOptions {
-        jvmTarget = "17"
-    }
-
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
+    }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_17)
     }
 }
 
@@ -76,6 +87,7 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.6")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.6")
     implementation("androidx.activity:activity-compose:1.9.2")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.6")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.6")
     implementation("androidx.navigation:navigation-compose:2.8.2")
 
@@ -90,6 +102,10 @@ dependencies {
     // Image Loading
     implementation("io.coil-kt:coil-compose:2.7.0")
 
+    implementation("com.squareup.retrofit2:retrofit:2.11.0")
+    implementation("com.squareup.retrofit2:converter-gson:2.11.0")
+    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
+
     implementation("com.google.maps.android:maps-compose:6.1.0")
     implementation("com.google.android.gms:play-services-maps:19.0.0")
     implementation("com.google.android.gms:play-services-location:21.3.0")
@@ -101,4 +117,12 @@ dependencies {
 
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
+}
+
+val testClasses by tasks.registering {
+    val unitTestSourceTasks = tasks.matching { task ->
+        task.name.endsWith("UnitTestSources")
+    }
+
+    dependsOn(unitTestSourceTasks)
 }

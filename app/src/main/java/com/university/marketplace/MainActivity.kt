@@ -13,13 +13,18 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.university.marketplace.data.FakeProductRepository
+import com.university.marketplace.data.auth.AuthRepositoryFactory
 import com.university.marketplace.data.location.AndroidLocationRepository
 import com.university.marketplace.map.MapViewModel
 import com.university.marketplace.map.MapViewModelFactory
+import com.university.marketplace.map.MapViewScreen
+import com.university.marketplace.ui.auth.AuthViewModel
+import com.university.marketplace.ui.auth.AuthViewModelFactory
+import com.university.marketplace.ui.auth.SignInScreen
+import com.university.marketplace.ui.auth.SignUpScreen
 import com.university.marketplace.ui.home.HomeMarketplaceScreen
 import com.university.marketplace.ui.home.HomeViewModel
 import com.university.marketplace.ui.home.HomeViewModelFactory
-import com.university.marketplace.map.MapViewScreen
 import com.university.marketplace.ui.theme.JetpackComposeAppTheme
 
 class MainActivity : ComponentActivity() {
@@ -38,9 +43,45 @@ fun AppNavigation() {
     val context = LocalContext.current
     val navController = rememberNavController()
     val productRepository = remember { FakeProductRepository() }
+    val authRepository = remember { AuthRepositoryFactory.create(context.applicationContext) }
     val locationRepository = remember { AndroidLocationRepository(context.applicationContext) }
+    val startDestination = if (authRepository.hasActiveSession()) "home" else "sign_in"
 
-    NavHost(navController = navController, startDestination = "home") {
+    NavHost(navController = navController, startDestination = startDestination) {
+        composable("sign_in") {
+            val authViewModel = viewModel<AuthViewModel>(
+                factory = AuthViewModelFactory(authRepository)
+            )
+            SignInScreen(
+                viewModel = authViewModel,
+                onNavigateToSignUp = {
+                    navController.navigate("sign_up")
+                },
+                onAuthenticated = {
+                    navController.navigate("home") {
+                        popUpTo("sign_in") { inclusive = true }
+                        launchSingleTop = true
+                    }
+                }
+            )
+        }
+        composable("sign_up") {
+            val authViewModel = viewModel<AuthViewModel>(
+                factory = AuthViewModelFactory(authRepository)
+            )
+            SignUpScreen(
+                viewModel = authViewModel,
+                onNavigateToSignIn = {
+                    navController.popBackStack()
+                },
+                onAuthenticated = {
+                    navController.navigate("home") {
+                        popUpTo("sign_in") { inclusive = true }
+                        launchSingleTop = true
+                    }
+                }
+            )
+        }
         composable("home") {
             val homeViewModel = viewModel<HomeViewModel>(
                 factory = HomeViewModelFactory(productRepository)
