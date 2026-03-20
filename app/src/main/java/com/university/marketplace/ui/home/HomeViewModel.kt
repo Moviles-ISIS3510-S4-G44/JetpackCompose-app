@@ -2,16 +2,17 @@ package com.university.marketplace.ui.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.university.marketplace.data.ListingsRepository
-import com.university.marketplace.data.api.ListingDto
+import com.university.marketplace.domain.Listing
+import com.university.marketplace.domain.usecase.GetActiveListingsUseCase
+import com.university.marketplace.domain.usecase.SearchListingsByRelevanceUseCase
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 class HomeViewModel(
-    private val repository: ListingsRepository = ListingsRepository()
+    private val getActiveListingsUseCase: GetActiveListingsUseCase,
+    private val searchListingsByRelevanceUseCase: SearchListingsByRelevanceUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<HomeUiState>(HomeUiState.Loading)
@@ -20,7 +21,7 @@ class HomeViewModel(
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
-    private var allListings: List<ListingUiModel> = emptyList()
+    private var allListings: List<Listing> = emptyList()
 
     init {
         loadListings()
@@ -30,13 +31,8 @@ class HomeViewModel(
         viewModelScope.launch {
             _uiState.value = HomeUiState.Loading
             try {
-                val dtos = repository.getListings()
-                val activeListings = dtos
-                    .filter { it.status.equals("active", ignoreCase = true) }
-                    .map { it.toUiModel() }
-                
-                allListings = activeListings
-                updateSections(activeListings)
+                allListings = getActiveListingsUseCase()
+                updateSections(allListings.map { it.toUiModel() })
             } catch (e: Exception) {
                 _uiState.value = HomeUiState.Error(e.message ?: "An unknown error occurred")
             }
@@ -58,19 +54,8 @@ class HomeViewModel(
         val filtered = if (query.isEmpty()) {
             allListings
         } else {
-            allListings.filter { 
-                it.name.contains(query, ignoreCase = true) || 
-                it.description.contains(query, ignoreCase = true)
-            }
+            searchListingsByRelevanceUseCase.execute(allListings, query)
         }
-        updateSections(filtered)
+        updateSections(filtered.map { it.toUiModel() })
     }
-
-    private fun ListingDto.toUiModel() = ListingUiModel(
-        id = id,
-        name = title,
-        price = price,
-        imageUrl = images.firstOrNull() ?: "",
-        description = description
-    )
 }

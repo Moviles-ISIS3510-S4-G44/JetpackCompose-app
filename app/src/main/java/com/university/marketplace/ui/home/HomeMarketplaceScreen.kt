@@ -21,7 +21,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.university.marketplace.ui.theme.MarketplaceYellow
 import com.university.marketplace.ui.theme.MarketplaceBackground
@@ -33,7 +32,7 @@ import com.university.marketplace.ui.theme.MarketplaceWhite
 fun HomeMarketplaceScreen(
     onNavigateToDetail: (String) -> Unit,
     onNavigateToSell: () -> Unit,
-    viewModel: HomeViewModel = viewModel()
+    viewModel: HomeViewModel
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
@@ -50,7 +49,6 @@ fun HomeMarketplaceScreen(
                 .fillMaxSize()
                 .background(MarketplaceBackground)
         ) {
-            // Header and Search Bar (Always visible)
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
                     text = "University Marketplace",
@@ -99,7 +97,6 @@ fun HomeMarketplaceScreen(
                 }
             }
 
-            // Content based on state
             when (val state = uiState) {
                 is HomeUiState.Loading -> {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {

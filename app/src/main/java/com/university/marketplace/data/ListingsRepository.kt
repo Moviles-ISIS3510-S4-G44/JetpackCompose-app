@@ -1,17 +1,21 @@
 package com.university.marketplace.data
 
-import com.university.marketplace.data.api.ListingDto
 import com.university.marketplace.data.api.ListingsApi
 import com.university.marketplace.data.api.NetworkModule
+import com.university.marketplace.data.mappers.toDomain
+import com.university.marketplace.domain.Listing
+import com.university.marketplace.domain.ListingRepository
 
 class ListingsRepository(
     private val api: ListingsApi = NetworkModule.listingsApi
-) {
-    suspend fun getListings(): List<ListingDto> {
+) : ListingRepository {
+    override suspend fun getActiveListings(): List<Listing> {
         return api.getListings()
+            .map { it.toDomain() }
+            .filter { it.status.equals("active", ignoreCase = true) }
     }
 
-    suspend fun getListingById(id: String): ListingDto {
-        return api.getListingById(id)
+    override suspend fun getListingById(id: String): Listing {
+        return api.getListingById(id).toDomain()
     }
 }

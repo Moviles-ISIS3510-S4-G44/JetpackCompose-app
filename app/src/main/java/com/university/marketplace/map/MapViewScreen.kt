@@ -1,5 +1,7 @@
 package com.university.marketplace.map
 
+import android.Manifest
+import android.content.pm.PackageManager
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -12,6 +14,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -19,13 +25,16 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.core.content.ContextCompat
 import coil.compose.AsyncImage
+import com.google.android.gms.location.LocationServices
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
 import com.google.maps.android.compose.*
-import com.university.marketplace.ui.home.ListingUiModel
 import com.university.marketplace.ui.theme.*
+import java.util.Locale
+
+private val DEFAULT_MAP_CENTER = LatLng(4.601, -74.065)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -33,12 +42,34 @@ fun MapViewScreen(
     productId: String,
     onBack: () -> Unit,
     onNavigateToDetail: (String) -> Unit,
-    viewModel: MapViewModel = viewModel()
+    viewModel: MapViewModel
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
+    val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
+    var userLocation by remember { mutableStateOf<LatLng?>(null) }
 
     LaunchedEffect(productId) {
         viewModel.loadListing(productId)
+
+        val hasFineLocation = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+
+        val hasCoarseLocation = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.ACCESS_COARSE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+
+        if (hasFineLocation || hasCoarseLocation) {
+            fusedLocationClient.lastLocation
+                .addOnSuccessListener { location ->
+                    if (location != null) {
+                        userLocation = LatLng(location.latitude, location.longitude)
+                    }
+                }
+        }
     }
 
     Scaffold(
@@ -79,25 +110,46 @@ fun MapViewScreen(
                 }
                 is MapUiState.Success -> {
                     val listing = state.listing
-                    val productLocation = LatLng(listing.latitude, listing.longitude)
-                    val cameraPositionState = rememberCameraPositionState {
-                        position = CameraPosition.fromLatLngZoom(productLocation, 15f)
+                    val productLocation = listing.latitude?.let { lat ->
+                        listing.longitude?.let { lng -> LatLng(lat, lng) }
                     }
-                    val markerState = rememberMarkerState(position = productLocation)
+                    val distanceText = userLocation?.let { currentUserLocation ->
+                        productLocation?.let {
+                            val distanceKm = DistanceUtils.calculateDistance(
+                                currentUserLocation.latitude,
+                                currentUserLocation.longitude,
+                                it.latitude,
+                                it.longitude
+                            )
+                            String.format(Locale.US, "Approx. %.1f km from you", distanceKm)
+                        }
+                    } ?: "Location unavailable"
+                    val cameraPositionState = rememberCameraPositionState {
+                        position = CameraPosition.fromLatLngZoom(productLocation ?: DEFAULT_MAP_CENTER, 15f)
+                    }
 
                     GoogleMap(
                         modifier = Modifier.fillMaxSize(),
                         cameraPositionState = cameraPositionState,
                         uiSettings = MapUiSettings(zoomControlsEnabled = false)
                     ) {
-                        Marker(
-                            state = markerState,
-                            title = listing.name,
-                            snippet = "$${listing.price}"
-                        )
+                        productLocation?.let {
+                            Marker(
+                                state = rememberMarkerState(position = it),
+                                title = listing.name,
+                                snippet = "$${listing.price}"
+                            )
+                        }
+
+                        userLocation?.let {
+                            Marker(
+                                state = rememberMarkerState(position = it),
+                                title = "You"
+                            )
+                        }
                     }
 
-                    // Product Detail Card on Map
+                    // Product Detail Card
                     Card(
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
@@ -169,7 +221,7 @@ fun MapViewScreen(
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = "Approx. 1.2 km from you",
+                                text = distanceText,
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MarketplaceDarkSecondary,
                                 fontWeight = FontWeight.Medium

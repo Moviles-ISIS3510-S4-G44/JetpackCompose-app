@@ -1,5 +1,7 @@
 package com.university.marketplace.ui.home
 
+import android.Manifest
+import android.content.pm.PackageManager
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -8,6 +10,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.Share
@@ -16,6 +19,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -24,21 +31,46 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.core.content.ContextCompat
 import coil.compose.AsyncImage
+import com.google.android.gms.location.LocationServices
+import com.university.marketplace.map.DistanceUtils
 import com.university.marketplace.ui.theme.*
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProductDetailScreen(
     productId: String,
     onBack: () -> Unit,
-    viewModel: ListingDetailViewModel = viewModel()
+    viewModel: ListingDetailViewModel
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
+    val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
+    var userCoordinates by remember { mutableStateOf<Pair<Double, Double>?>(null) }
 
     LaunchedEffect(productId) {
         viewModel.loadListing(productId)
+
+        val hasFineLocation = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+
+        val hasCoarseLocation = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.ACCESS_COARSE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+
+        if (hasFineLocation || hasCoarseLocation) {
+            fusedLocationClient.lastLocation
+                .addOnSuccessListener { location ->
+                    if (location != null) {
+                        userCoordinates = location.latitude to location.longitude
+                    }
+                }
+        }
     }
 
     Scaffold(
@@ -77,7 +109,7 @@ fun ProductDetailScreen(
                             colors = ButtonDefaults.buttonColors(containerColor = MarketplaceYellow),
                             shape = RoundedCornerShape(28.dp)
                         ) {
-                            Icon(Icons.Default.Chat, contentDescription = null, tint = MarketplaceDark)
+                            Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = null, tint = MarketplaceDark)
                             Spacer(Modifier.width(8.dp))
                             Text("Contact Seller", color = MarketplaceDark, fontWeight = FontWeight.Bold)
                         }
@@ -107,6 +139,19 @@ fun ProductDetailScreen(
                 }
                 is ListingDetailUiState.Success -> {
                     val listing = state.listing
+                    val distanceText = if (listing.latitude != null && listing.longitude != null) {
+                        userCoordinates?.let { (lat, lon) ->
+                            val distanceKm = DistanceUtils.calculateDistance(
+                                lat,
+                                lon,
+                                listing.latitude,
+                                listing.longitude
+                            )
+                            String.format(Locale.US, "%s • %.1f km away", listing.locationName, distanceKm)
+                        } ?: "${listing.locationName} • distance unavailable"
+                    } else {
+                        "${listing.locationName} • location unavailable"
+                    }
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
@@ -181,7 +226,7 @@ fun ProductDetailScreen(
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(Icons.Default.LocationOn, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(18.dp))
                                 Text(
-                                    text = "${listing.locationName} • 1.2 km away",
+                                    text = distanceText,
                                     modifier = Modifier.padding(start = 8.dp),
                                     color = Color.Gray,
                                     fontSize = 14.sp
