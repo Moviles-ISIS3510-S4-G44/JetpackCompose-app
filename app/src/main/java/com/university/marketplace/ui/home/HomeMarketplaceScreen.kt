@@ -36,6 +36,7 @@ fun HomeMarketplaceScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
+    val isSearching = searchQuery.isNotBlank()
     val categories = listOf("Books", "Electronics", "Furniture", "Study")
 
     Scaffold(
@@ -95,7 +96,6 @@ fun HomeMarketplaceScreen(
                         )
                     }
                 }
-            }
 
             when (val state = uiState) {
                 is HomeUiState.Loading -> {
