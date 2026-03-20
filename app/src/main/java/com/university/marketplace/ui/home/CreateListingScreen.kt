@@ -30,14 +30,12 @@ import com.university.marketplace.ui.theme.* // Importa tus colores personalizad
 fun CreateListingScreen(
     onBack: () -> Unit
 ) {
-    // ESTADOS: Usando la misma lógica de remember de tu Home
     var title by remember { mutableStateOf("") }
     var price by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
     var selectedCondition by remember { mutableStateOf("New") }
     var imageUri by remember { mutableStateOf<Uri?>(null) }
 
-    // Launcher para la Galería (Sensor)
     val galleryLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri -> imageUri = uri }
@@ -55,11 +53,9 @@ fun CreateListingScreen(
             )
         },
         bottomBar = {
-            // Botón de Publicar Estilo Marketplace
             Box(modifier = Modifier.padding(16.dp).navigationBarsPadding()) {
                 Button(
                     onClick = {
-                        // Registro de Evento Analytics (Type-2)
                         println("ANALYTICS: create_listing | Title: $title")
                     },
                     modifier = Modifier.fillMaxWidth().height(56.dp),
@@ -81,11 +77,9 @@ fun CreateListingScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp)
         ) {
-            // Sección de Fotos
             Text("Photos", fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 8.dp))
 
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                // Botón de Agregar Foto con Borde Punteado (Simulado)
                 Box(
                     modifier = Modifier
                         .size(100.dp)
@@ -113,14 +107,14 @@ fun CreateListingScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Inputs Estilo Material3 (Como tu barra de búsqueda)
+            // Inputs
             MarketplaceTextField(value = title, onValueChange = { title = it }, label = "Title (e.g. Organic Chemistry)")
             Spacer(modifier = Modifier.height(12.dp))
             MarketplaceTextField(value = price, onValueChange = { price = it }, label = "$ Price")
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Selector de Condición (Segmented Control)
+            // Selector
             Text("Condition", fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 8.dp))
             ConditionToggleGroup(
                 selectedCondition = selectedCondition,
@@ -129,7 +123,7 @@ fun CreateListingScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Descripción
+            // Description
             MarketplaceTextField(
                 value = description,
                 onValueChange = { description = it },

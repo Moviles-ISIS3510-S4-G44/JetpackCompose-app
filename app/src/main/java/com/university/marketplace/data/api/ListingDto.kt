@@ -1,7 +1,6 @@
 package com.university.marketplace.data.api
 
 import com.squareup.moshi.Json
-import java.math.BigDecimal
 
 data class ListingDto(
     val id: String,
@@ -9,9 +8,14 @@ data class ListingDto(
     @Json(name = "category_id") val categoryId: String,
     val title: String,
     val description: String,
-    val price: Double, // Moshi handles Double for BigDecimal-compatible numbers by default
+    val price: Double,
     val condition: String,
     val images: List<String>,
     val status: String,
-    val location: String
+    val location: Any? // Can be String or Map<String, Double>
+)
+
+data class LocationDto(
+    val latitude: Double,
+    val longitude: Double
 )

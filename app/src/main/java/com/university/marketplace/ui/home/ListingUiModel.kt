@@ -9,8 +9,8 @@ data class ListingUiModel(
     val isFeatured: Boolean = false,
     val description: String = "",
     val category: String = "General",
-    val latitude: Double = 4.601,
-    val longitude: Double = -74.065,
+    val latitude: Double? = null,
+    val longitude: Double? = null,
     val condition: String = "Used",
     val sellerName: String = "Alex Johnson",
     val locationName: String = "Campus"

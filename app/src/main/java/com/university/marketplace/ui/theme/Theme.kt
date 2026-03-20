@@ -28,7 +28,6 @@ fun JetpackComposeAppTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit
 ) {
-    // We'll stick to Light theme for now as per the user's palette request
     val colorScheme = LightColorScheme
     
     val view = LocalView.current
