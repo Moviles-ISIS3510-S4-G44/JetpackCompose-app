@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -14,6 +15,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.university.marketplace.data.FakeProductRepository
 import com.university.marketplace.data.auth.AuthRepositoryFactory
+import com.university.marketplace.data.auth.UnauthorizedAuthException
 import com.university.marketplace.data.location.AndroidLocationRepository
 import com.university.marketplace.map.MapViewModel
 import com.university.marketplace.map.MapViewModelFactory
@@ -25,6 +27,7 @@ import com.university.marketplace.ui.auth.SignUpScreen
 import com.university.marketplace.ui.home.HomeMarketplaceScreen
 import com.university.marketplace.ui.home.HomeViewModel
 import com.university.marketplace.ui.home.HomeViewModelFactory
+import com.university.marketplace.ui.profile.ProfileRoute
 import com.university.marketplace.ui.theme.JetpackComposeAppTheme
 
 class MainActivity : ComponentActivity() {
@@ -46,6 +49,19 @@ fun AppNavigation() {
     val authRepository = remember { AuthRepositoryFactory.create(context.applicationContext) }
     val locationRepository = remember { AndroidLocationRepository(context.applicationContext) }
     val startDestination = if (authRepository.hasActiveSession()) "home" else "sign_in"
+    val navigateToTopLevel: (String) -> Unit = { route ->
+        navController.navigate(route) {
+            popUpTo("home") { inclusive = false }
+            launchSingleTop = true
+        }
+    }
+    val navigateToSignIn: () -> Unit = {
+        authRepository.clearSession()
+        navController.navigate("sign_in") {
+            popUpTo(navController.graph.startDestinationId) { inclusive = true }
+            launchSingleTop = true
+        }
+    }
 
     NavHost(navController = navController, startDestination = startDestination) {
         composable("sign_in") {
@@ -86,11 +102,31 @@ fun AppNavigation() {
             val homeViewModel = viewModel<HomeViewModel>(
                 factory = HomeViewModelFactory(productRepository)
             )
+            LaunchedEffect(Unit) {
+                try {
+                    authRepository.getCurrentUser()
+                } catch (_: UnauthorizedAuthException) {
+                    navigateToSignIn()
+                }
+            }
             HomeMarketplaceScreen(
                 viewModel = homeViewModel,
+                onNavigateToProfile = {
+                    navigateToTopLevel("profile")
+                },
                 onNavigateToMap = { product ->
                     navController.navigate("map/${product.id}")
                 }
+            )
+        }
+        composable("profile") {
+            ProfileRoute(
+                authRepository = authRepository,
+                onNavigateHome = {
+                    navigateToTopLevel("home")
+                },
+                onLogout = navigateToSignIn,
+                onUnauthorized = navigateToSignIn
             )
         }
         composable(

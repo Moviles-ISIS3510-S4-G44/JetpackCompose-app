@@ -26,7 +26,11 @@ class DefaultAuthRepository(
     ): AuthenticatedUser = withContext(Dispatchers.IO) {
         val loginResponse = apiService.login(email = email, password = password)
         if (!loginResponse.isSuccessful) {
-            throw AuthException(extractErrorMessage(loginResponse.code(), loginResponse.errorBody()?.string()))
+            throw buildAuthException(
+                statusCode = loginResponse.code(),
+                errorBody = loginResponse.errorBody()?.string(),
+                unauthorizedMessage = "Invalid credentials. Please check your email and password."
+            )
         }
 
         val token = loginResponse.body()?.accessToken
@@ -60,7 +64,10 @@ class DefaultAuthRepository(
             )
         )
         if (!signupResponse.isSuccessful) {
-            throw AuthException(extractErrorMessage(signupResponse.code(), signupResponse.errorBody()?.string()))
+            throw buildAuthException(
+                statusCode = signupResponse.code(),
+                errorBody = signupResponse.errorBody()?.string()
+            )
         }
 
         login(email = email, password = password, persistSession = persistSession)
@@ -81,8 +88,13 @@ class DefaultAuthRepository(
     private suspend fun getCurrentUser(token: String): AuthenticatedUser {
         val currentUserResponse = apiService.getCurrentUser(authorization = "Bearer $token")
         if (!currentUserResponse.isSuccessful) {
-            throw AuthException(
-                extractErrorMessage(currentUserResponse.code(), currentUserResponse.errorBody()?.string())
+            if (currentUserResponse.code() == 401) {
+                sessionStorage.clear()
+            }
+            throw buildAuthException(
+                statusCode = currentUserResponse.code(),
+                errorBody = currentUserResponse.errorBody()?.string(),
+                unauthorizedMessage = "Your session has expired. Please sign in again."
             )
         }
 
@@ -99,24 +111,37 @@ class DefaultAuthRepository(
         )
     }
 
-    private fun extractErrorMessage(statusCode: Int, errorBody: String?): String {
+    private fun buildAuthException(
+        statusCode: Int,
+        errorBody: String?,
+        unauthorizedMessage: String = "We could not complete the request. Please try again."
+    ): AuthException {
         val apiMessage = runCatching {
             gson.fromJson(errorBody, ApiErrorResponseDto::class.java)?.detail
         }.getOrNull()
 
-        if (!apiMessage.isNullOrBlank()) {
-            return apiMessage
-        }
+        val message =
+            if (!apiMessage.isNullOrBlank()) {
+                apiMessage
+            } else {
+                when (statusCode) {
+                    401 -> unauthorizedMessage
+                    409 -> "This email is already registered."
+                    else -> "We could not complete the request. Please try again."
+                }
+            }
 
-        return when (statusCode) {
-            401 -> "Invalid credentials. Please check your email and password."
-            409 -> "This email is already registered."
-            else -> "We could not complete the request. Please try again."
+        return if (statusCode == 401) {
+            UnauthorizedAuthException(message)
+        } else {
+            AuthException(message)
         }
     }
 }
 
-class AuthException(message: String) : Exception(message)
+open class AuthException(message: String) : Exception(message)
+
+class UnauthorizedAuthException(message: String) : AuthException(message)
 
 object AuthRepositoryFactory {
     fun create(context: Context): AuthRepository {
