@@ -2,9 +2,8 @@ package com.university.marketplace.map
 
 import android.Manifest
 import android.content.pm.PackageManager
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -19,6 +18,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -28,6 +28,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import coil.compose.AsyncImage
+import com.google.android.gms.location.LocationServices
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
 import com.google.maps.android.compose.GoogleMap
@@ -44,60 +45,56 @@ import com.university.marketplace.ui.theme.MarketplaceDarkSecondary
 import com.university.marketplace.ui.theme.MarketplaceGray
 import com.university.marketplace.ui.theme.MarketplaceWhite
 import com.university.marketplace.ui.theme.MarketplaceYellow
+import com.google.maps.android.compose.*
+import com.university.marketplace.ui.theme.*
+import java.util.Locale
+
+private val DEFAULT_MAP_CENTER = LatLng(4.601, -74.065)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MapViewScreen(
     isOnline: Boolean,
-    viewModel: MapViewModel,
-    onBack: () -> Unit
+    productId: String,
+    onBack: () -> Unit,
+    onNavigateToDetail: (String) -> Unit,
+    viewModel: MapViewModel
 ) {
-    val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
     val offlineBannerController = rememberOfflineBannerController(isOnline)
+    val context = LocalContext.current
+    val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
+    var userLocation by remember { mutableStateOf<LatLng?>(null) }
 
-    var hasCheckedPermission by remember { mutableStateOf(false) }
-    val locationPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestMultiplePermissions()
-    ) { permissions ->
-        val granted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
-            permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
-        viewModel.onLocationPermissionResult(granted)
-    }
+    LaunchedEffect(productId) {
+        viewModel.loadListing(productId)
 
-    LaunchedEffect(Unit) {
-        if (!hasCheckedPermission) {
-            hasCheckedPermission = true
-            val granted = ContextCompat.checkSelfPermission(
-                context,
-                Manifest.permission.ACCESS_FINE_LOCATION
-            ) == PackageManager.PERMISSION_GRANTED ||
-                ContextCompat.checkSelfPermission(
-                    context,
-                    Manifest.permission.ACCESS_COARSE_LOCATION
-                ) == PackageManager.PERMISSION_GRANTED
+        val hasFineLocation = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
 
-            if (granted) {
-                viewModel.onLocationPermissionResult(true)
-            } else {
-                locationPermissionLauncher.launch(
-                    arrayOf(
-                        Manifest.permission.ACCESS_FINE_LOCATION,
-                        Manifest.permission.ACCESS_COARSE_LOCATION
-                    )
-                )
-            }
+        val hasCoarseLocation = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.ACCESS_COARSE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+
+        if (hasFineLocation || hasCoarseLocation) {
+            fusedLocationClient.lastLocation
+                .addOnSuccessListener { location ->
+                    if (location != null) {
+                        userLocation = LatLng(location.latitude, location.longitude)
+                    }
+                }
         }
     }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = {
-                    Text(
-                        text = uiState.product?.name ?: "Mapa del producto",
-                        fontWeight = FontWeight.Bold
-                    )
+                title = { 
+                    val title = if (uiState is MapUiState.Success) (uiState as MapUiState.Success).listing.name else "Location"
+                    Text(title, fontWeight = FontWeight.Bold) 
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
@@ -260,6 +257,132 @@ fun MapViewScreen(
                             color = MarketplaceDarkSecondary,
                             fontWeight = FontWeight.Medium
                         )
+            when (val state = uiState) {
+                is MapUiState.Loading -> {
+                    CircularProgressIndicator(modifier = Modifier.align(Alignment.Center), color = MarketplaceYellow)
+                }
+                is MapUiState.Error -> {
+                    Text(text = state.message, color = Color.Red, modifier = Modifier.align(Alignment.Center))
+                }
+                is MapUiState.Success -> {
+                    val listing = state.listing
+                    val productLocation = listing.latitude?.let { lat ->
+                        listing.longitude?.let { lng -> LatLng(lat, lng) }
+                    }
+                    val distanceText = userLocation?.let { currentUserLocation ->
+                        productLocation?.let {
+                            val distanceKm = DistanceUtils.calculateDistance(
+                                currentUserLocation.latitude,
+                                currentUserLocation.longitude,
+                                it.latitude,
+                                it.longitude
+                            )
+                            String.format(Locale.US, "Approx. %.1f km from you", distanceKm)
+                        }
+                    } ?: "Location unavailable"
+                    val cameraPositionState = rememberCameraPositionState {
+                        position = CameraPosition.fromLatLngZoom(productLocation ?: DEFAULT_MAP_CENTER, 15f)
+                    }
+
+                    GoogleMap(
+                        modifier = Modifier.fillMaxSize(),
+                        cameraPositionState = cameraPositionState,
+                        uiSettings = MapUiSettings(zoomControlsEnabled = false)
+                    ) {
+                        productLocation?.let {
+                            Marker(
+                                state = rememberMarkerState(position = it),
+                                title = listing.name,
+                                snippet = "$${listing.price}"
+                            )
+                        }
+
+                        userLocation?.let {
+                            Marker(
+                                state = rememberMarkerState(position = it),
+                                title = "You"
+                            )
+                        }
+                    }
+
+                    // Product Detail Card
+                    Card(
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .padding(16.dp)
+                            .fillMaxWidth()
+                            .clickable{ onNavigateToDetail(listing.id) },
+                        shape = RoundedCornerShape(24.dp),
+                        colors = CardDefaults.cardColors(containerColor = MarketplaceWhite),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            AsyncImage(
+                                model = listing.imageUrl,
+                                contentDescription = null,
+                                modifier = Modifier
+                                    .size(80.dp)
+                                    .clip(RoundedCornerShape(16.dp)),
+                                contentScale = ContentScale.Crop
+                            )
+                            
+                            Spacer(modifier = Modifier.width(16.dp))
+                            
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = listing.name,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MarketplaceDark
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        Icons.Default.Star, 
+                                        contentDescription = null, 
+                                        tint = MarketplaceYellow, 
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Text(
+                                        text = " ${listing.rating}", 
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MarketplaceGray
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "• ${listing.category}", 
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MarketplaceGray
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = "$${listing.price.toInt()}",
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = MarketplaceDark
+                                )
+                            }
+                        }
+                        
+                        // Distance Indicator
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(MarketplaceBackground.copy(alpha = 0.5f))
+                                .padding(vertical = 8.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = distanceText,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MarketplaceDarkSecondary,
+                                fontWeight = FontWeight.Medium
+                              )
+                        }
                     }
                 }
             }

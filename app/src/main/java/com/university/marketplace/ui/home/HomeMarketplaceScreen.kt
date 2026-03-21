@@ -37,9 +37,11 @@ fun HomeMarketplaceScreen(
     isOnline: Boolean,
     onNavigateToProfile: () -> Unit,
     onNavigateToMap: (Product) -> Unit,
+    onNavigateToDetail: (String) -> Unit,
+    onNavigateToSell: () -> Unit,
     viewModel: HomeViewModel
 ) {
-    val products by viewModel.products.collectAsState()
+    val uiState by viewModel.uiState.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
     val isSearching = searchQuery.isNotBlank()
     val categories = listOf("Books", "Electronics", "Furniture", "Study")
@@ -57,7 +59,7 @@ fun HomeMarketplaceScreen(
             )
         }
     ) { padding ->
-        LazyColumn(
+        Column(
             modifier = Modifier
                 .padding(padding)
                 .fillMaxSize()
@@ -119,19 +121,49 @@ fun HomeMarketplaceScreen(
                     }
                 }
             }
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    text = "University Marketplace",
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MarketplaceDark
+                )
+                Spacer(modifier = Modifier.height(16.dp))
 
-            if (isSearching) {
-                item {
-                    SectionHeader(title = "Resultados", onSeeAllClick = {})
-                }
+                // Search Bar
+                TextField(
+                    value = searchQuery,
+                    onValueChange = { viewModel.onSearchQueryChanged(it) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(24.dp)),
+                    placeholder = { Text("Search for items...") },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Color.Gray) },
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = MarketplaceWhite,
+                        unfocusedContainerColor = MarketplaceWhite,
+                        disabledContainerColor = MarketplaceWhite,
+                        focusedIndicatorColor = Color.Transparent,
+                        unfocusedIndicatorColor = Color.Transparent,
+                    ),
+                    singleLine = true
+                )
 
-                if (products.isEmpty()) {
-                    item {
-                        Text(
-                            text = "No encontramos productos para '$searchQuery'",
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = Color.Gray
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Categories
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(categories) { category ->
+                        SuggestionChip(
+                            onClick = { },
+                            label = { Text(category) },
+                            shape = RoundedCornerShape(20.dp),
+                            colors = SuggestionChipDefaults.suggestionChipColors(
+                                containerColor = MarketplaceWhite
+                            ),
+                            border = null
                         )
                     }
                 } else {
@@ -155,15 +187,19 @@ fun HomeMarketplaceScreen(
                                 Spacer(modifier = Modifier.weight(1f))
                             }
                         }
+                }
+
+            when (val state = uiState) {
+                is HomeUiState.Loading -> {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = MarketplaceYellow)
                     }
                 }
-            } else {
-                // Featured Section
-                item {
-                    SectionHeader(title = "Featured", onSeeAllClick = {})
-                    LazyRow(
-                        contentPadding = PaddingValues(horizontal = 16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                is HomeUiState.Error -> {
+                    Column(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalArrangement = Arrangement.Center,
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         items(products.filter { it.isFeatured }) { product ->
                             FeaturedProductCard(
@@ -174,14 +210,37 @@ fun HomeMarketplaceScreen(
                                     }
                                 }
                             )
+                        Text(text = state.message, color = Color.Red, modifier = Modifier.padding(16.dp))
+                        Button(
+                            onClick = { viewModel.loadListings() },
+                            colors = ButtonDefaults.buttonColors(containerColor = MarketplaceYellow)
+                        ) {
+                            Text("Retry", color = MarketplaceDark)
                         }
                     }
                 }
+                is HomeUiState.Success -> {
+                    LazyColumn(modifier = Modifier.fillMaxSize()) {
+                        // Featured Section
+                        if (state.featured.isNotEmpty()) {
+                            item {
+                                SectionHeader(title = if (state.isSearching) "Search Results" else "Featured", onSeeAllClick = {})
+                                LazyRow(
+                                    contentPadding = PaddingValues(horizontal = 16.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                                ) {
+                                    items(state.featured) { listing ->
+                                        FeaturedProductCard(listing, onClick = { onNavigateToDetail(listing.id) })
+                                    }
+                                }
+                            }
+                        }
 
-                // Recent Listings Section
-                item {
-                    SectionHeader(title = "Recent Listings", onSeeAllClick = {})
-                }
+                        // Recent Listings Section
+                        if (state.recent.isNotEmpty()) {
+                            item {
+                                SectionHeader(title = if (state.isSearching) "" else "Recent Listings", onSeeAllClick = {})
+                            }
 
                 items(products.filter { !it.isFeatured }.chunked(2)) { pair ->
                     Row(
@@ -198,21 +257,44 @@ fun HomeMarketplaceScreen(
                                     }
                                 }
                             )
+                            items(state.recent.chunked(2)) { pair ->
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                                ) {
+                                    pair.forEach { listing ->
+                                        RecentProductCard(
+                                            listing = listing,
+                                            modifier = Modifier.weight(1f),
+                                            onClick = { onNavigateToDetail(listing.id) }
+                                        )
+                                    }
+                                    if (pair.size == 1) {
+                                        Spacer(modifier = Modifier.weight(1f))
+                                    }
+                                }
+                            }
                         }
-                        if (pair.size == 1) {
-                            Spacer(modifier = Modifier.weight(1f))
+                        
+                        if (state.featured.isEmpty() && state.recent.isEmpty()) {
+                            item {
+                                Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                                    Text("No items found")
+                                }
+                            }
                         }
+
+                        item { Spacer(modifier = Modifier.height(16.dp)) }
                     }
                 }
             }
-            
-            item { Spacer(modifier = Modifier.height(16.dp)) }
         }
     }
 }
 
 @Composable
 fun SectionHeader(title: String, onSeeAllClick: () -> Unit) {
+    if (title.isEmpty()) return
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -222,8 +304,8 @@ fun SectionHeader(title: String, onSeeAllClick: () -> Unit) {
     ) {
         Text(text = title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
         Text(
-            text = "See all", 
-            style = MaterialTheme.typography.bodyMedium, 
+            text = "See all",
+            style = MaterialTheme.typography.bodyMedium,
             color = Color.Gray,
             modifier = Modifier.clickable { onSeeAllClick() }
         )
@@ -231,7 +313,7 @@ fun SectionHeader(title: String, onSeeAllClick: () -> Unit) {
 }
 
 @Composable
-fun FeaturedProductCard(product: Product, onClick: () -> Unit) {
+fun FeaturedProductCard(listing: ListingUiModel, onClick: () -> Unit) {
     Card(
         modifier = Modifier
             .width(200.dp)
@@ -241,8 +323,8 @@ fun FeaturedProductCard(product: Product, onClick: () -> Unit) {
     ) {
         Box {
             AsyncImage(
-                model = product.imageUrl,
-                contentDescription = product.name,
+                model = listing.imageUrl,
+                contentDescription = listing.name,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(150.dp),
@@ -263,16 +345,16 @@ fun FeaturedProductCard(product: Product, onClick: () -> Unit) {
             }
         }
         Column(modifier = Modifier.padding(12.dp)) {
-            Text(text = product.name, maxLines = 1, fontWeight = FontWeight.SemiBold)
+            Text(text = listing.name, maxLines = 1, fontWeight = FontWeight.SemiBold)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(text = "$${product.price.toInt()}", fontWeight = FontWeight.Bold)
+                Text(text = "$${listing.price.toInt()}", fontWeight = FontWeight.Bold)
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.Star, contentDescription = null, tint = MarketplaceYellow, modifier = Modifier.size(16.dp))
-                    Text(text = "${product.rating}", style = MaterialTheme.typography.bodySmall)
+                    Text(text = "${listing.rating}", style = MaterialTheme.typography.bodySmall)
                 }
             }
         }
@@ -280,7 +362,7 @@ fun FeaturedProductCard(product: Product, onClick: () -> Unit) {
 }
 
 @Composable
-fun RecentProductCard(product: Product, modifier: Modifier = Modifier, onClick: () -> Unit) {
+fun RecentProductCard(listing: ListingUiModel, modifier: Modifier = Modifier, onClick: () -> Unit) {
     Card(
         modifier = modifier.clickable { onClick() },
         shape = RoundedCornerShape(16.dp),
@@ -288,24 +370,24 @@ fun RecentProductCard(product: Product, modifier: Modifier = Modifier, onClick: 
     ) {
         Column {
             AsyncImage(
-                model = product.imageUrl,
-                contentDescription = product.name,
+                model = listing.imageUrl,
+                contentDescription = listing.name,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(120.dp),
                 contentScale = ContentScale.Crop
             )
             Column(modifier = Modifier.padding(12.dp)) {
-                Text(text = product.name, maxLines = 1, style = MaterialTheme.typography.bodyMedium)
+                Text(text = listing.name, maxLines = 1, style = MaterialTheme.typography.bodyMedium)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(text = "$${product.price.toInt()}", fontWeight = FontWeight.Bold)
+                    Text(text = "$${listing.price.toInt()}", fontWeight = FontWeight.Bold)
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Default.Star, contentDescription = null, tint = MarketplaceYellow, modifier = Modifier.size(14.dp))
-                        Text(text = "${product.rating}", style = MaterialTheme.typography.bodySmall)
+                        Text(text = "${listing.rating}", style = MaterialTheme.typography.bodySmall)
                     }
                 }
             }
@@ -330,6 +412,8 @@ fun MarketplaceBottomNavigation(
             BottomNavItem("Profile", Icons.Filled.Person, Icons.Outlined.PersonOutline, route = "profile")
         )
 
+        var selectedItem by remember { mutableStateOf(0) }
+
         items.forEach { item ->
             val selected = item.route == currentRoute
             NavigationBarItem(
@@ -350,6 +434,13 @@ fun MarketplaceBottomNavigation(
                 onClick = {
                     item.route?.let(onNavigate)
                 },
+                selected = selectedItem == index,
+                onClick = { selectedItem = index
+                          if (item.title == "Sell") {
+                              onSellClick()
+                          }
+
+                          },
                 colors = NavigationBarItemDefaults.colors(
                     selectedIconColor = MarketplaceDark,
                     unselectedIconColor = Color.Gray,
