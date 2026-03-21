@@ -26,7 +26,7 @@ import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Divider
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -56,6 +56,9 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.university.marketplace.ui.common.OfflineBanner
+import com.university.marketplace.ui.common.rememberOfflineBannerController
+import com.university.marketplace.ui.common.runWhenOnline
 import com.university.marketplace.ui.theme.MarketplaceDark
 import com.university.marketplace.ui.theme.MarketplaceGray
 import com.university.marketplace.ui.theme.MarketplaceWhite
@@ -70,11 +73,13 @@ private val AuthDecorativeHeaderColor = MarketplaceDark.copy(alpha = 0.1f)
 
 @Composable
 fun SignInScreen(
+    isOnline: Boolean,
     viewModel: AuthViewModel,
     onNavigateToSignUp: () -> Unit,
     onAuthenticated: () -> Unit
 ) {
     AuthRoute(
+        isOnline = isOnline,
         title = "Login",
         subtitle = "Access your academic marketplace dashboard.",
         primaryActionLabel = "LOGIN",
@@ -96,11 +101,13 @@ fun SignInScreen(
 
 @Composable
 fun SignUpScreen(
+    isOnline: Boolean,
     viewModel: AuthViewModel,
     onNavigateToSignIn: () -> Unit,
     onAuthenticated: () -> Unit
 ) {
     AuthRoute(
+        isOnline = isOnline,
         title = "Create account",
         subtitle = "Join the academic marketplace with your university email.",
         primaryActionLabel = "SIGN UP",
@@ -123,6 +130,7 @@ fun SignUpScreen(
 
 @Composable
 private fun AuthRoute(
+    isOnline: Boolean,
     title: String,
     subtitle: String,
     primaryActionLabel: String,
@@ -137,6 +145,7 @@ private fun AuthRoute(
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
+    val offlineBannerController = rememberOfflineBannerController(isOnline)
 
     var name by rememberSaveable { mutableStateOf("") }
     var email by rememberSaveable { mutableStateOf("") }
@@ -187,6 +196,13 @@ private fun AuthRoute(
                     color = AuthSupportingTextColor
                 )
                 Spacer(modifier = Modifier.height(28.dp))
+                OfflineBanner(
+                    isOnline = isOnline,
+                    offlineBannerController = offlineBannerController
+                )
+                if (!isOnline && !offlineBannerController.isDismissed) {
+                    Spacer(modifier = Modifier.height(20.dp))
+                }
 
                 if (showNameField) {
                     AuthFieldLabel(text = "FULL NAME")
@@ -274,7 +290,9 @@ private fun AuthRoute(
                                 snackbarHostState.showSnackbar(error)
                             }
                         } else {
-                            onPrimaryAction(name.trim(), email.trim(), password, persistSession)
+                            runWhenOnline(isOnline, offlineBannerController) {
+                                onPrimaryAction(name.trim(), email.trim(), password, persistSession)
+                            }
                         }
                     },
                     enabled = !uiState.isLoading,
@@ -508,7 +526,7 @@ private fun AuthDivider(text: String) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Divider(
+        HorizontalDivider(
             modifier = Modifier.weight(1f),
             color = AuthDividerColor
         )
@@ -518,7 +536,7 @@ private fun AuthDivider(text: String) {
             color = AuthSupportingTextColor,
             letterSpacing = 1.sp
         )
-        Divider(
+        HorizontalDivider(
             modifier = Modifier.weight(1f),
             color = AuthDividerColor
         )

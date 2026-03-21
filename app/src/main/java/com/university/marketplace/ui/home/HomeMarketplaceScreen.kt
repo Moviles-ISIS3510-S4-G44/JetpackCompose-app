@@ -23,6 +23,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.university.marketplace.domain.Product
+import com.university.marketplace.ui.common.OfflineBanner
+import com.university.marketplace.ui.common.rememberOfflineBannerController
+import com.university.marketplace.ui.common.runWhenOnline
 import com.university.marketplace.ui.theme.MarketplaceYellow
 import com.university.marketplace.ui.theme.MarketplaceBackground
 import com.university.marketplace.ui.theme.MarketplaceDark
@@ -31,6 +34,7 @@ import com.university.marketplace.ui.theme.MarketplaceWhite
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeMarketplaceScreen(
+    isOnline: Boolean,
     onNavigateToProfile: () -> Unit,
     onNavigateToMap: (Product) -> Unit,
     viewModel: HomeViewModel
@@ -39,6 +43,7 @@ fun HomeMarketplaceScreen(
     val searchQuery by viewModel.searchQuery.collectAsState()
     val isSearching = searchQuery.isNotBlank()
     val categories = listOf("Books", "Electronics", "Furniture", "Study")
+    val offlineBannerController = rememberOfflineBannerController(isOnline)
 
     Scaffold(
         bottomBar = {
@@ -67,6 +72,13 @@ fun HomeMarketplaceScreen(
                         color = MarketplaceDark
                     )
                     Spacer(modifier = Modifier.height(16.dp))
+                    OfflineBanner(
+                        isOnline = isOnline,
+                        offlineBannerController = offlineBannerController
+                    )
+                    if (!isOnline && !offlineBannerController.isDismissed) {
+                        Spacer(modifier = Modifier.height(16.dp))
+                    }
                     
                     // Search Bar
                     TextField(
@@ -132,7 +144,11 @@ fun HomeMarketplaceScreen(
                                 RecentProductCard(
                                     product = product,
                                     modifier = Modifier.weight(1f),
-                                    onClick = { onNavigateToMap(product) }
+                                    onClick = {
+                                        runWhenOnline(isOnline, offlineBannerController) {
+                                            onNavigateToMap(product)
+                                        }
+                                    }
                                 )
                             }
                             if (pair.size == 1) {
@@ -150,7 +166,14 @@ fun HomeMarketplaceScreen(
                         horizontalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         items(products.filter { it.isFeatured }) { product ->
-                            FeaturedProductCard(product, onClick = { onNavigateToMap(product) })
+                            FeaturedProductCard(
+                                product,
+                                onClick = {
+                                    runWhenOnline(isOnline, offlineBannerController) {
+                                        onNavigateToMap(product)
+                                    }
+                                }
+                            )
                         }
                     }
                 }
@@ -169,7 +192,11 @@ fun HomeMarketplaceScreen(
                             RecentProductCard(
                                 product = product,
                                 modifier = Modifier.weight(1f),
-                                onClick = { onNavigateToMap(product) }
+                                onClick = {
+                                    runWhenOnline(isOnline, offlineBannerController) {
+                                        onNavigateToMap(product)
+                                    }
+                                }
                             )
                         }
                         if (pair.size == 1) {

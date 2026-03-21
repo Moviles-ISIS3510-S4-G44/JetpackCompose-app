@@ -42,6 +42,8 @@ import com.university.marketplace.data.auth.AuthException
 import com.university.marketplace.data.auth.AuthRepository
 import com.university.marketplace.data.auth.UnauthorizedAuthException
 import com.university.marketplace.domain.AuthenticatedUser
+import com.university.marketplace.ui.common.OfflineBanner
+import com.university.marketplace.ui.common.rememberOfflineBannerController
 import com.university.marketplace.ui.home.MarketplaceBottomNavigation
 import com.university.marketplace.ui.theme.MarketplaceBackground
 import com.university.marketplace.ui.theme.MarketplaceDark
@@ -51,6 +53,7 @@ import com.university.marketplace.ui.theme.MarketplaceYellow
 @Composable
 fun ProfileRoute(
     authRepository: AuthRepository,
+    isOnline: Boolean,
     onNavigateHome: () -> Unit,
     onLogout: () -> Unit,
     onUnauthorized: () -> Unit
@@ -59,7 +62,14 @@ fun ProfileRoute(
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isLoading by remember { mutableStateOf(true) }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(isOnline) {
+        if (!isOnline) {
+            isLoading = false
+            if (user == null) {
+                errorMessage = "You are offline. Connect to the internet to load your profile."
+            }
+            return@LaunchedEffect
+        }
         isLoading = true
         errorMessage = null
         try {
@@ -74,6 +84,7 @@ fun ProfileRoute(
     }
 
     ProfileScreen(
+        isOnline = isOnline,
         user = user,
         isLoading = isLoading,
         errorMessage = errorMessage,
@@ -84,6 +95,7 @@ fun ProfileRoute(
 
 @Composable
 private fun ProfileScreen(
+    isOnline: Boolean,
     user: AuthenticatedUser?,
     isLoading: Boolean,
     errorMessage: String?,
@@ -91,6 +103,7 @@ private fun ProfileScreen(
     onLogout: () -> Unit
 ) {
     var showLogoutDialog by remember { mutableStateOf(false) }
+    val offlineBannerController = rememberOfflineBannerController(isOnline)
 
     if (showLogoutDialog) {
         AlertDialog(
@@ -127,138 +140,148 @@ private fun ProfileScreen(
             )
         }
     ) { padding ->
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .background(MarketplaceBackground)
                 .padding(padding)
         ) {
-            when {
-                isLoading -> {
-                    CircularProgressIndicator(
-                        modifier = Modifier.align(Alignment.Center),
-                        color = MarketplaceDark
-                    )
-                }
-
-                errorMessage != null -> {
-                    Column(
-                        modifier = Modifier
-                            .align(Alignment.Center)
-                            .padding(24.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Text(
-                            text = errorMessage,
-                            style = MaterialTheme.typography.bodyLarge,
+            OfflineBanner(
+                isOnline = isOnline,
+                offlineBannerController = offlineBannerController
+            )
+            Box(
+                modifier = Modifier.weight(1f)
+            ) {
+                when {
+                    isLoading -> {
+                        CircularProgressIndicator(
+                            modifier = Modifier.align(Alignment.Center),
                             color = MarketplaceDark
                         )
-                        Button(
-                            onClick = onLogout,
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MarketplaceYellow,
-                                contentColor = MarketplaceDark
-                            )
-                        ) {
-                            Text(text = "Go to sign in", fontWeight = FontWeight.Bold)
-                        }
                     }
-                }
 
-                user != null -> {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(20.dp),
-                        verticalArrangement = Arrangement.spacedBy(20.dp)
-                    ) {
-                        Text(
-                            text = "Profile",
-                            style = MaterialTheme.typography.headlineMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MarketplaceDark
-                        )
-
-                        Card(
-                            colors = CardDefaults.cardColors(containerColor = MarketplaceWhite),
-                            shape = RoundedCornerShape(24.dp),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-                            modifier = Modifier.fillMaxWidth()
+                    errorMessage != null -> {
+                        Column(
+                            modifier = Modifier
+                                .align(Alignment.Center)
+                                .padding(24.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(24.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(88.dp)
-                                        .clip(CircleShape)
-                                        .background(MarketplaceYellow.copy(alpha = 0.25f)),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Person,
-                                        contentDescription = null,
-                                        tint = MarketplaceDark,
-                                        modifier = Modifier.size(42.dp)
-                                    )
-                                }
-                                Spacer(modifier = Modifier.height(16.dp))
-                                Text(
-                                    text = user.name,
-                                    style = MaterialTheme.typography.headlineSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MarketplaceDark
-                                )
-                                Spacer(modifier = Modifier.height(6.dp))
-                                Text(
-                                    text = user.email,
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = MarketplaceDark.copy(alpha = 0.7f)
-                                )
-                                Spacer(modifier = Modifier.height(20.dp))
-                                ProfileInfoRow(
-                                    label = "Account ID",
-                                    value = user.id,
-                                    monospaceValue = true
-                                )
-                                Spacer(modifier = Modifier.height(14.dp))
-                                ProfileInfoRow(label = "Rating", value = user.rating.toString())
-                            }
-                        }
-
-                        Card(
-                            colors = CardDefaults.cardColors(containerColor = MarketplaceWhite),
-                            shape = RoundedCornerShape(20.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Column(modifier = Modifier.padding(20.dp)) {
-                                Text(
-                                    text = "Session",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MarketplaceDark
-                                )
-                                Spacer(modifier = Modifier.height(10.dp))
-                                Text(
-                                    text = "You are signed in with your university account.",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MarketplaceDark.copy(alpha = 0.7f)
-                                )
-                                Spacer(modifier = Modifier.height(18.dp))
+                            Text(
+                                text = errorMessage,
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MarketplaceDark
+                            )
+                            if (isOnline) {
                                 Button(
-                                    onClick = { showLogoutDialog = true },
-                                    modifier = Modifier.fillMaxWidth(),
+                                    onClick = onLogout,
                                     colors = ButtonDefaults.buttonColors(
                                         containerColor = MarketplaceYellow,
                                         contentColor = MarketplaceDark
-                                    ),
-                                    shape = RoundedCornerShape(16.dp)
+                                    )
                                 ) {
-                                    Text(text = "Log out", fontWeight = FontWeight.Bold)
+                                    Text(text = "Go to sign in", fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    }
+
+                    user != null -> {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(20.dp),
+                            verticalArrangement = Arrangement.spacedBy(20.dp)
+                        ) {
+                            Text(
+                                text = "Profile",
+                                style = MaterialTheme.typography.headlineMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MarketplaceDark
+                            )
+
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = MarketplaceWhite),
+                                shape = RoundedCornerShape(24.dp),
+                                elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(24.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(88.dp)
+                                            .clip(CircleShape)
+                                            .background(MarketplaceYellow.copy(alpha = 0.25f)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Person,
+                                            contentDescription = null,
+                                            tint = MarketplaceDark,
+                                            modifier = Modifier.size(42.dp)
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.height(16.dp))
+                                    Text(
+                                        text = user.name,
+                                        style = MaterialTheme.typography.headlineSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MarketplaceDark
+                                    )
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Text(
+                                        text = user.email,
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        color = MarketplaceDark.copy(alpha = 0.7f)
+                                    )
+                                    Spacer(modifier = Modifier.height(20.dp))
+                                    ProfileInfoRow(
+                                        label = "Account ID",
+                                        value = user.id,
+                                        monospaceValue = true
+                                    )
+                                    Spacer(modifier = Modifier.height(14.dp))
+                                    ProfileInfoRow(label = "Rating", value = user.rating.toString())
+                                }
+                            }
+
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = MarketplaceWhite),
+                                shape = RoundedCornerShape(20.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.padding(20.dp)) {
+                                    Text(
+                                        text = "Session",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MarketplaceDark
+                                    )
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                    Text(
+                                        text = "You are signed in with your university account.",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MarketplaceDark.copy(alpha = 0.7f)
+                                    )
+                                    Spacer(modifier = Modifier.height(18.dp))
+                                    Button(
+                                        onClick = { showLogoutDialog = true },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = MarketplaceYellow,
+                                            contentColor = MarketplaceDark
+                                        ),
+                                        shape = RoundedCornerShape(16.dp)
+                                    ) {
+                                        Text(text = "Log out", fontWeight = FontWeight.Bold)
+                                    }
                                 }
                             }
                         }
