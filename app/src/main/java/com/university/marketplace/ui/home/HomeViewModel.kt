@@ -8,6 +8,7 @@ import com.university.marketplace.domain.usecase.SearchListingsByRelevanceUseCas
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 
 class HomeViewModel(
     private val getActiveListingsUseCase: GetActiveListingsUseCase,
@@ -56,19 +57,6 @@ class HomeViewModel(
             searchListingsByRelevanceUseCase.execute(allListings, query)
         }
         updateSections(filtered.map { it.toUiModel() })
-    }
-}
-
-@Suppress("unused")
-class HomeViewModelFactory(
-    private val repository: ProductRepository
-) : ViewModelProvider.Factory {
-    @Suppress("UNCHECKED_CAST")
-    override fun <T : ViewModel> create(modelClass: Class<T>): T {
-        if (modelClass.isAssignableFrom(HomeViewModel::class.java)) {
-            return HomeViewModel(repository) as T
-        }
-        throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
     }
 }
 

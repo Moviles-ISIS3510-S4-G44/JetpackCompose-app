@@ -1,5 +1,6 @@
 package com.university.marketplace.data.api
 
+import com.university.marketplace.BuildConfig
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import okhttp3.OkHttpClient
@@ -8,7 +9,9 @@ import retrofit2.Retrofit
 import retrofit2.converter.moshi.MoshiConverterFactory
 
 object NetworkModule {
-    private const val BASE_URL = "http://10.0.2.2:8000/"
+    private fun normalizeBaseUrl(baseUrl: String): String {
+        return if (baseUrl.endsWith('/')) baseUrl else "$baseUrl/"
+    }
 
     private val moshi = Moshi.Builder()
         .add(KotlinJsonAdapterFactory())
@@ -23,7 +26,7 @@ object NetworkModule {
         .build()
 
     private val retrofit = Retrofit.Builder()
-        .baseUrl(BASE_URL)
+        .baseUrl(normalizeBaseUrl(BuildConfig.API_BASE_URL))
         .client(okHttpClient)
         .addConverterFactory(MoshiConverterFactory.create(moshi))
         .build()

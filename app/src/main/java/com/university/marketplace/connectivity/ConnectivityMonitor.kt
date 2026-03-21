@@ -20,16 +20,24 @@ interface ConnectivityMonitor {
 class AndroidConnectivityMonitor(
     context: Context
 ) : ConnectivityMonitor {
-    private val connectivityManager = context.getSystemService(ConnectivityManager::class.java)
+    private val connectivityManager =
+        context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
 
     override val isOnline: Flow<Boolean> = callbackFlow {
+        val manager = connectivityManager
+        if (manager == null) {
+            trySend(false)
+            close()
+            return@callbackFlow
+        }
+
         val callback = object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) {
-                trySend(connectivityManager.isCurrentlyOnline())
+                trySend(manager.isCurrentlyOnline())
             }
 
             override fun onLost(network: Network) {
-                trySend(connectivityManager.isCurrentlyOnline())
+                trySend(manager.isCurrentlyOnline())
             }
 
             override fun onCapabilitiesChanged(
@@ -53,18 +61,24 @@ class AndroidConnectivityMonitor(
             .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
             .build()
 
-        connectivityManager.registerNetworkCallback(request, callback)
+        try {
+            manager.registerNetworkCallback(request, callback)
+        } catch (_: SecurityException) {
+            trySend(false)
+            close()
+            return@callbackFlow
+        }
 
         awaitClose {
             runCatching {
-                connectivityManager.unregisterNetworkCallback(callback)
+                manager.unregisterNetworkCallback(callback)
             }
         }
     }
         .distinctUntilChanged()
         .conflate()
 
-    override fun isCurrentlyOnline(): Boolean = connectivityManager.isCurrentlyOnline()
+    override fun isCurrentlyOnline(): Boolean = connectivityManager?.isCurrentlyOnline() == true
 }
 
 private fun ConnectivityManager.isCurrentlyOnline(): Boolean {

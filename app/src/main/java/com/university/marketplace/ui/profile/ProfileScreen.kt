@@ -55,6 +55,7 @@ fun ProfileRoute(
     authRepository: AuthRepository,
     isOnline: Boolean,
     onNavigateHome: () -> Unit,
+    onNavigateSell: () -> Unit,
     onLogout: () -> Unit,
     onUnauthorized: () -> Unit
 ) {
@@ -89,6 +90,7 @@ fun ProfileRoute(
         isLoading = isLoading,
         errorMessage = errorMessage,
         onNavigateHome = onNavigateHome,
+        onNavigateSell = onNavigateSell,
         onLogout = onLogout
     )
 }
@@ -100,6 +102,7 @@ private fun ProfileScreen(
     isLoading: Boolean,
     errorMessage: String?,
     onNavigateHome: () -> Unit,
+    onNavigateSell: () -> Unit,
     onLogout: () -> Unit
 ) {
     var showLogoutDialog by remember { mutableStateOf(false) }
@@ -133,8 +136,9 @@ private fun ProfileScreen(
             MarketplaceBottomNavigation(
                 currentRoute = "profile",
                 onNavigate = { route ->
-                    if (route == "home") {
-                        onNavigateHome()
+                    when (route) {
+                        "home" -> onNavigateHome()
+                        "create_listing" -> onNavigateSell()
                     }
                 }
             )
@@ -171,8 +175,8 @@ private fun ProfileScreen(
                         ) {
                             Text(
                                 text = errorMessage,
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = MarketplaceDark
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MarketplaceDark.copy(alpha = 0.6f)
                             )
                             if (isOnline) {
                                 Button(

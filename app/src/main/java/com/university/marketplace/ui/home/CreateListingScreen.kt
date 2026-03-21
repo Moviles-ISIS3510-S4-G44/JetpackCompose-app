@@ -28,7 +28,8 @@ import com.university.marketplace.ui.theme.* // Importa tus colores personalizad
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CreateListingScreen(
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    isOnline: Boolean
 ) {
     var title by remember { mutableStateOf("") }
     var price by remember { mutableStateOf("") }
@@ -60,6 +61,7 @@ fun CreateListingScreen(
                     },
                     modifier = Modifier.fillMaxWidth().height(56.dp),
                     shape = RoundedCornerShape(28.dp),
+                    enabled = isOnline,
                     colors = ButtonDefaults.buttonColors(containerColor = MarketplaceYellow)
                 ) {
                     Icon(Icons.Default.Send, contentDescription = null, tint = MarketplaceDark)
@@ -131,6 +133,15 @@ fun CreateListingScreen(
                 singleLine = false,
                 modifier = Modifier.height(120.dp)
             )
+
+            if (!isOnline) {
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = "You are offline. Publishing is disabled until the connection is restored.",
+                    color = Color.Red,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
         }
     }
 }

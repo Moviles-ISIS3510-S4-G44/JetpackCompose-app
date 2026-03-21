@@ -1,13 +1,14 @@
 package com.university.marketplace
 
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
@@ -15,39 +16,29 @@ import androidx.navigation.navArgument
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.university.marketplace.connectivity.AndroidConnectivityMonitor
-import com.university.marketplace.data.FakeProductRepository
+import com.university.marketplace.di.DefaultAppContainer
 import com.university.marketplace.data.auth.AuthRepositoryFactory
 import com.university.marketplace.data.auth.UnauthorizedAuthException
-import com.university.marketplace.data.location.AndroidLocationRepository
+import com.university.marketplace.connectivity.AndroidConnectivityMonitor
 import com.university.marketplace.map.MapViewModel
-import com.university.marketplace.map.MapViewModelFactory
 import com.university.marketplace.map.MapViewScreen
 import com.university.marketplace.ui.auth.AuthViewModel
 import com.university.marketplace.ui.auth.AuthViewModelFactory
 import com.university.marketplace.ui.auth.SignInScreen
 import com.university.marketplace.ui.auth.SignUpScreen
-import com.university.marketplace.ui.home.HomeMarketplaceScreen
-import com.university.marketplace.ui.home.HomeViewModel
-import com.university.marketplace.ui.home.HomeViewModelFactory
-import com.university.marketplace.ui.profile.ProfileRoute
-import androidx.lifecycle.viewmodel.compose.viewModel
-import com.university.marketplace.map.MapViewModel
 import com.university.marketplace.ui.MarketplaceViewModelFactory
-import com.university.marketplace.map.MapViewScreen
-import androidx.navigation.NavType
-import androidx.navigation.navArgument
-import com.university.marketplace.ui.home.CreateListingScreen
 import com.university.marketplace.ui.home.HomeMarketplaceScreen
 import com.university.marketplace.ui.home.HomeViewModel
+import com.university.marketplace.ui.home.CreateListingScreen
 import com.university.marketplace.ui.home.ListingDetailViewModel
 import com.university.marketplace.ui.home.ProductDetailScreen
+import com.university.marketplace.ui.profile.ProfileRoute
 import com.university.marketplace.ui.theme.JetpackComposeAppTheme
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val container = (application as MarketplaceApplication).container
+        val container = (application as? MarketplaceApplication)?.container ?: DefaultAppContainer()
         setContent {
             JetpackComposeAppTheme {
                 AppNavigation(factory = MarketplaceViewModelFactory(container))
@@ -59,13 +50,10 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun AppNavigation(factory: MarketplaceViewModelFactory) {
     val navController = rememberNavController()
-    val productRepository = remember { FakeProductRepository() }
-    val authRepository = remember { AuthRepositoryFactory.create(context.applicationContext) }
-    val locationRepository = remember { AndroidLocationRepository(context.applicationContext) }
+    val context = LocalContext.current
     val connectivityMonitor = remember { AndroidConnectivityMonitor(context.applicationContext) }
-    val isOnline by connectivityMonitor.isOnline.collectAsState(
-        initial = connectivityMonitor.isCurrentlyOnline()
-    )
+    val isOnline by connectivityMonitor.isOnline.collectAsState(initial = connectivityMonitor.isCurrentlyOnline())
+    val authRepository = remember { AuthRepositoryFactory.create(context.applicationContext) }
     val startDestination = if (authRepository.hasActiveSession()) "home" else "sign_in"
     val navigateToTopLevel: (String) -> Unit = { route ->
         navController.navigate(route) {
@@ -79,6 +67,11 @@ fun AppNavigation(factory: MarketplaceViewModelFactory) {
             popUpTo(navController.graph.startDestinationId) { inclusive = true }
             launchSingleTop = true
         }
+    }
+
+    LaunchedEffect(isOnline) {
+        val message = if (isOnline) "Connection restored" else "No internet connection"
+        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
     }
 
     NavHost(navController = navController, startDestination = startDestination) {
@@ -119,13 +112,8 @@ fun AppNavigation(factory: MarketplaceViewModelFactory) {
             )
         }
         composable("home") {
-            val homeViewModel = viewModel<HomeViewModel>(
-                factory = HomeViewModelFactory(productRepository)
-            )
-            LaunchedEffect(isOnline) {
-                if (!isOnline) {
-                    return@LaunchedEffect
-                }
+            val homeViewModel: HomeViewModel = viewModel(factory = factory)
+            LaunchedEffect(Unit) {
                 try {
                     authRepository.getCurrentUser()
                 } catch (_: UnauthorizedAuthException) {
@@ -133,14 +121,21 @@ fun AppNavigation(factory: MarketplaceViewModelFactory) {
                 }
             }
             HomeMarketplaceScreen(
-                isOnline = isOnline,
                 viewModel = homeViewModel,
                 onNavigateToProfile = {
                     navigateToTopLevel("profile")
                 },
-                onNavigateToMap = { product ->
-                    navController.navigate("map/${product.id}")
-                }
+                onNavigateToDetail = { listingId ->
+                    navController.navigate("map/$listingId")
+                },
+                onNavigateToSell = {
+                    if (isOnline) {
+                        navController.navigate("create_listing")
+                    } else {
+                        Toast.makeText(context, "Cannot create listing while offline", Toast.LENGTH_SHORT).show()
+                    }
+                },
+                isOnline = isOnline
             )
         }
         composable("profile") {
@@ -149,6 +144,13 @@ fun AppNavigation(factory: MarketplaceViewModelFactory) {
                 isOnline = isOnline,
                 onNavigateHome = {
                     navigateToTopLevel("home")
+                },
+                onNavigateSell = {
+                    if (isOnline) {
+                        navController.navigate("create_listing")
+                    } else {
+                        Toast.makeText(context, "Cannot create listing while offline", Toast.LENGTH_SHORT).show()
+                    }
                 },
                 onLogout = navigateToSignIn,
                 onUnauthorized = navigateToSignIn
@@ -164,8 +166,6 @@ fun AppNavigation(factory: MarketplaceViewModelFactory) {
                 val mapViewModel: MapViewModel = viewModel(factory = factory)
                 MapViewScreen(
                     isOnline = isOnline,
-                    viewModel = mapViewModel,
-                    onBack = { navController.popBackStack() }
                     productId = productId,
                     onBack = { navController.popBackStack() },
                     onNavigateToDetail = { id ->
@@ -177,7 +177,10 @@ fun AppNavigation(factory: MarketplaceViewModelFactory) {
         }
         // Sell
         composable("create_listing") {
-            CreateListingScreen({ navController.popBackStack() })
+            CreateListingScreen(
+                onBack = { navController.popBackStack() },
+                isOnline = isOnline
+            )
         }
         // Detail Product
         composable(

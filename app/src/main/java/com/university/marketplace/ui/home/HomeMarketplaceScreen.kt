@@ -2,16 +2,55 @@ package com.university.marketplace.ui.home
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.outlined.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ChatBubble
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.ChatBubbleOutline
+import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.PersonOutline
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SuggestionChip
+import androidx.compose.material3.SuggestionChipDefaults
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -22,38 +61,32 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
-import com.university.marketplace.domain.Product
-import com.university.marketplace.ui.common.OfflineBanner
-import com.university.marketplace.ui.common.rememberOfflineBannerController
-import com.university.marketplace.ui.common.runWhenOnline
-import com.university.marketplace.ui.theme.MarketplaceYellow
 import com.university.marketplace.ui.theme.MarketplaceBackground
 import com.university.marketplace.ui.theme.MarketplaceDark
 import com.university.marketplace.ui.theme.MarketplaceWhite
+import com.university.marketplace.ui.theme.MarketplaceYellow
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeMarketplaceScreen(
-    isOnline: Boolean,
     onNavigateToProfile: () -> Unit,
-    onNavigateToMap: (Product) -> Unit,
     onNavigateToDetail: (String) -> Unit,
     onNavigateToSell: () -> Unit,
+    isOnline: Boolean,
     viewModel: HomeViewModel
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
-    val isSearching = searchQuery.isNotBlank()
     val categories = listOf("Books", "Electronics", "Furniture", "Study")
-    val offlineBannerController = rememberOfflineBannerController(isOnline)
 
     Scaffold(
         bottomBar = {
             MarketplaceBottomNavigation(
                 currentRoute = "home",
                 onNavigate = { route ->
-                    if (route == "profile") {
-                        onNavigateToProfile()
+                    when (route) {
+                        "profile" -> onNavigateToProfile()
+                        "create_listing" -> onNavigateToSell()
                     }
                 }
             )
@@ -65,62 +98,6 @@ fun HomeMarketplaceScreen(
                 .fillMaxSize()
                 .background(MarketplaceBackground)
         ) {
-            item {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = "University Marketplace",
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MarketplaceDark
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    OfflineBanner(
-                        isOnline = isOnline,
-                        offlineBannerController = offlineBannerController
-                    )
-                    if (!isOnline && !offlineBannerController.isDismissed) {
-                        Spacer(modifier = Modifier.height(16.dp))
-                    }
-                    
-                    // Search Bar
-                    TextField(
-                        value = searchQuery,
-                        onValueChange = { viewModel.onSearchQueryChanged(it) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(24.dp)),
-                        placeholder = { Text("Search for items...") },
-                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Color.Gray) },
-                        colors = TextFieldDefaults.colors(
-                            focusedContainerColor = MarketplaceWhite,
-                            unfocusedContainerColor = MarketplaceWhite,
-                            disabledContainerColor = MarketplaceWhite,
-                            focusedIndicatorColor = Color.Transparent,
-                            unfocusedIndicatorColor = Color.Transparent,
-                        ),
-                        singleLine = true
-                    )
-                    
-                    Spacer(modifier = Modifier.height(16.dp))
-                    
-                    // Categories
-                    LazyRow(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        items(categories) { category ->
-                            SuggestionChip(
-                                onClick = { },
-                                label = { Text(category) },
-                                shape = RoundedCornerShape(20.dp),
-                                colors = SuggestionChipDefaults.suggestionChipColors(
-                                    containerColor = MarketplaceWhite
-                                ),
-                                border = null
-                            )
-                        }
-                    }
-                }
-            }
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
                     text = "University Marketplace",
@@ -133,28 +110,46 @@ fun HomeMarketplaceScreen(
                 // Search Bar
                 TextField(
                     value = searchQuery,
-                    onValueChange = { viewModel.onSearchQueryChanged(it) },
+                    onValueChange = {
+                        if (isOnline) {
+                            viewModel.onSearchQueryChanged(it)
+                        }
+                    },
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(24.dp)),
-                    placeholder = { Text("Search for items...") },
-                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Color.Gray) },
+                    placeholder = { Text(if (isOnline) "Search for items..." else "No internet connection") },
+                    leadingIcon = {
+                        Icon(
+                            Icons.Default.Search,
+                            contentDescription = null,
+                            tint = Color.Gray
+                        )
+                    },
                     colors = TextFieldDefaults.colors(
                         focusedContainerColor = MarketplaceWhite,
                         unfocusedContainerColor = MarketplaceWhite,
                         disabledContainerColor = MarketplaceWhite,
                         focusedIndicatorColor = Color.Transparent,
-                        unfocusedIndicatorColor = Color.Transparent,
+                        unfocusedIndicatorColor = Color.Transparent
                     ),
+                    enabled = isOnline,
                     singleLine = true
                 )
+
+                if (!isOnline) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "You are offline. Search and publishing actions are temporarily disabled.",
+                        color = Color.Red,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
                 // Categories
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(categories) { category ->
                         SuggestionChip(
                             onClick = { },
@@ -166,28 +161,8 @@ fun HomeMarketplaceScreen(
                             border = null
                         )
                     }
-                } else {
-                    items(products.chunked(2)) { pair ->
-                        Row(
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                            horizontalArrangement = Arrangement.spacedBy(16.dp)
-                        ) {
-                            pair.forEach { product ->
-                                RecentProductCard(
-                                    product = product,
-                                    modifier = Modifier.weight(1f),
-                                    onClick = {
-                                        runWhenOnline(isOnline, offlineBannerController) {
-                                            onNavigateToMap(product)
-                                        }
-                                    }
-                                )
-                            }
-                            if (pair.size == 1) {
-                                Spacer(modifier = Modifier.weight(1f))
-                            }
-                        }
                 }
+            }
 
             when (val state = uiState) {
                 is HomeUiState.Loading -> {
@@ -201,16 +176,11 @@ fun HomeMarketplaceScreen(
                         verticalArrangement = Arrangement.Center,
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        items(products.filter { it.isFeatured }) { product ->
-                            FeaturedProductCard(
-                                product,
-                                onClick = {
-                                    runWhenOnline(isOnline, offlineBannerController) {
-                                        onNavigateToMap(product)
-                                    }
-                                }
-                            )
-                        Text(text = state.message, color = Color.Red, modifier = Modifier.padding(16.dp))
+                        Text(
+                            text = state.message,
+                            color = Color.Red,
+                            modifier = Modifier.padding(16.dp)
+                        )
                         Button(
                             onClick = { viewModel.loadListings() },
                             colors = ButtonDefaults.buttonColors(containerColor = MarketplaceYellow)
@@ -224,13 +194,19 @@ fun HomeMarketplaceScreen(
                         // Featured Section
                         if (state.featured.isNotEmpty()) {
                             item {
-                                SectionHeader(title = if (state.isSearching) "Search Results" else "Featured", onSeeAllClick = {})
+                                SectionHeader(
+                                    title = if (state.isSearching) "Search Results" else "Featured",
+                                    onSeeAllClick = {}
+                                )
                                 LazyRow(
                                     contentPadding = PaddingValues(horizontal = 16.dp),
                                     horizontalArrangement = Arrangement.spacedBy(16.dp)
                                 ) {
                                     items(state.featured) { listing ->
-                                        FeaturedProductCard(listing, onClick = { onNavigateToDetail(listing.id) })
+                                        FeaturedProductCard(
+                                            listing = listing,
+                                            onClick = { onNavigateToDetail(listing.id) }
+                                        )
                                     }
                                 }
                             }
@@ -239,24 +215,12 @@ fun HomeMarketplaceScreen(
                         // Recent Listings Section
                         if (state.recent.isNotEmpty()) {
                             item {
-                                SectionHeader(title = if (state.isSearching) "" else "Recent Listings", onSeeAllClick = {})
+                                SectionHeader(
+                                    title = if (state.isSearching) "" else "Recent Listings",
+                                    onSeeAllClick = {}
+                                )
                             }
 
-                items(products.filter { !it.isFeatured }.chunked(2)) { pair ->
-                    Row(
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        pair.forEach { product ->
-                            RecentProductCard(
-                                product = product,
-                                modifier = Modifier.weight(1f),
-                                onClick = {
-                                    runWhenOnline(isOnline, offlineBannerController) {
-                                        onNavigateToMap(product)
-                                    }
-                                }
-                            )
                             items(state.recent.chunked(2)) { pair ->
                                 Row(
                                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
@@ -275,10 +239,15 @@ fun HomeMarketplaceScreen(
                                 }
                             }
                         }
-                        
+
                         if (state.featured.isEmpty() && state.recent.isEmpty()) {
                             item {
-                                Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(32.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
                                     Text("No items found")
                                 }
                             }
@@ -332,7 +301,9 @@ fun FeaturedProductCard(listing: ListingUiModel, onClick: () -> Unit) {
             )
             // Featured Badge
             Surface(
-                modifier = Modifier.padding(8.dp).align(Alignment.TopEnd),
+                modifier = Modifier
+                    .padding(8.dp)
+                    .align(Alignment.TopEnd),
                 color = MarketplaceYellow,
                 shape = RoundedCornerShape(12.dp)
             ) {
@@ -353,7 +324,12 @@ fun FeaturedProductCard(listing: ListingUiModel, onClick: () -> Unit) {
             ) {
                 Text(text = "$${listing.price.toInt()}", fontWeight = FontWeight.Bold)
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Star, contentDescription = null, tint = MarketplaceYellow, modifier = Modifier.size(16.dp))
+                    Icon(
+                        Icons.Default.Star,
+                        contentDescription = null,
+                        tint = MarketplaceYellow,
+                        modifier = Modifier.size(16.dp)
+                    )
                     Text(text = "${listing.rating}", style = MaterialTheme.typography.bodySmall)
                 }
             }
@@ -386,7 +362,12 @@ fun RecentProductCard(listing: ListingUiModel, modifier: Modifier = Modifier, on
                 ) {
                     Text(text = "$${listing.price.toInt()}", fontWeight = FontWeight.Bold)
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Star, contentDescription = null, tint = MarketplaceYellow, modifier = Modifier.size(14.dp))
+                        Icon(
+                            Icons.Default.Star,
+                            contentDescription = null,
+                            tint = MarketplaceYellow,
+                            modifier = Modifier.size(14.dp)
+                        )
                         Text(text = "${listing.rating}", style = MaterialTheme.typography.bodySmall)
                     }
                 }
@@ -406,24 +387,26 @@ fun MarketplaceBottomNavigation(
     ) {
         val items = listOf(
             BottomNavItem("Home", Icons.Filled.Home, Icons.Outlined.Home, route = "home"),
-            BottomNavItem("Search", Icons.Filled.Search, Icons.Outlined.Search),
-            BottomNavItem("Sell", Icons.Filled.Add, Icons.Outlined.Add),
-            BottomNavItem("Messages", Icons.Filled.ChatBubble, Icons.Outlined.ChatBubbleOutline),
+            BottomNavItem("Search", Icons.Filled.Search, Icons.Outlined.Search, route = "home"),
+            BottomNavItem("Sell", Icons.Filled.Add, Icons.Outlined.Add, route = "create_listing"),
+            BottomNavItem("Messages", Icons.Filled.ChatBubble, Icons.Outlined.ChatBubbleOutline, route = "home"),
             BottomNavItem("Profile", Icons.Filled.Person, Icons.Outlined.PersonOutline, route = "profile")
         )
-
-        var selectedItem by remember { mutableStateOf(0) }
 
         items.forEach { item ->
             val selected = item.route == currentRoute
             NavigationBarItem(
-                icon = { 
+                icon = {
                     if (selected) {
                         Surface(
                             color = MarketplaceYellow.copy(alpha = 0.2f),
                             shape = RoundedCornerShape(12.dp)
                         ) {
-                            Icon(item.selectedIcon, contentDescription = item.title, modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp))
+                            Icon(
+                                item.selectedIcon,
+                                contentDescription = item.title,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                            )
                         }
                     } else {
                         Icon(item.unselectedIcon, contentDescription = item.title)
@@ -431,16 +414,7 @@ fun MarketplaceBottomNavigation(
                 },
                 label = { Text(item.title, fontSize = 10.sp) },
                 selected = selected,
-                onClick = {
-                    item.route?.let(onNavigate)
-                },
-                selected = selectedItem == index,
-                onClick = { selectedItem = index
-                          if (item.title == "Sell") {
-                              onSellClick()
-                          }
-
-                          },
+                onClick = { onNavigate(item.route) },
                 colors = NavigationBarItemDefaults.colors(
                     selectedIconColor = MarketplaceDark,
                     unselectedIconColor = Color.Gray,
@@ -455,5 +429,5 @@ data class BottomNavItem(
     val title: String,
     val selectedIcon: ImageVector,
     val unselectedIcon: ImageVector,
-    val route: String? = null
+    val route: String
 )

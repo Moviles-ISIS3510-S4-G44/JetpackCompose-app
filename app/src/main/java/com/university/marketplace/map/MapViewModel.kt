@@ -3,18 +3,12 @@ package com.university.marketplace.map
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.university.marketplace.domain.usecase.GetListingByIdUseCase
-import com.university.marketplace.ui.home.ListingUiModel
 import com.university.marketplace.ui.home.toUiModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-sealed interface MapUiState {
-    object Loading : MapUiState
-    data class Success(val listing: ListingUiModel) : MapUiState
-    data class Error(val message: String) : MapUiState
-}
 
 class MapViewModel(
     private val getListingByIdUseCase: GetListingByIdUseCase

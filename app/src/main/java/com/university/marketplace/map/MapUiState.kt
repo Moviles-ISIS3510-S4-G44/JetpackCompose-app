@@ -1,14 +1,10 @@
 package com.university.marketplace.map
 
-import com.university.marketplace.domain.Product
+import com.university.marketplace.ui.home.ListingUiModel
 
-data class MapUiState(
-    val isLoading: Boolean = true,
-    val product: Product? = null,
-    val hasLocationPermission: Boolean = false,
-    val userLatitude: Double? = null,
-    val userLongitude: Double? = null,
-    val distanceLabel: String = "Activa tu ubicacion para calcular distancia",
-    val errorMessage: String? = null
-)
+sealed interface MapUiState {
+    object Loading : MapUiState
+    data class Success(val listing: ListingUiModel) : MapUiState
+    data class Error(val message: String) : MapUiState
+}
 
