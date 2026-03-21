@@ -22,6 +22,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.university.marketplace.domain.Product
+import com.university.marketplace.ui.common.OfflineBanner
+import com.university.marketplace.ui.common.rememberOfflineBannerController
+import com.university.marketplace.ui.common.runWhenOnline
 import com.university.marketplace.ui.theme.MarketplaceYellow
 import com.university.marketplace.ui.theme.MarketplaceBackground
 import com.university.marketplace.ui.theme.MarketplaceDark
@@ -30,6 +34,7 @@ import com.university.marketplace.ui.theme.MarketplaceWhite
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeMarketplaceScreen(
+    isOnline: Boolean,
     onNavigateToProfile: () -> Unit,
     onNavigateToMap: (Product) -> Unit,
     onNavigateToDetail: (String) -> Unit,
@@ -40,6 +45,7 @@ fun HomeMarketplaceScreen(
     val searchQuery by viewModel.searchQuery.collectAsState()
     val isSearching = searchQuery.isNotBlank()
     val categories = listOf("Books", "Electronics", "Furniture", "Study")
+    val offlineBannerController = rememberOfflineBannerController(isOnline)
 
     Scaffold(
         bottomBar = {
@@ -59,6 +65,62 @@ fun HomeMarketplaceScreen(
                 .fillMaxSize()
                 .background(MarketplaceBackground)
         ) {
+            item {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = "University Marketplace",
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MarketplaceDark
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    OfflineBanner(
+                        isOnline = isOnline,
+                        offlineBannerController = offlineBannerController
+                    )
+                    if (!isOnline && !offlineBannerController.isDismissed) {
+                        Spacer(modifier = Modifier.height(16.dp))
+                    }
+                    
+                    // Search Bar
+                    TextField(
+                        value = searchQuery,
+                        onValueChange = { viewModel.onSearchQueryChanged(it) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(24.dp)),
+                        placeholder = { Text("Search for items...") },
+                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Color.Gray) },
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = MarketplaceWhite,
+                            unfocusedContainerColor = MarketplaceWhite,
+                            disabledContainerColor = MarketplaceWhite,
+                            focusedIndicatorColor = Color.Transparent,
+                            unfocusedIndicatorColor = Color.Transparent,
+                        ),
+                        singleLine = true
+                    )
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    // Categories
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(categories) { category ->
+                            SuggestionChip(
+                                onClick = { },
+                                label = { Text(category) },
+                                shape = RoundedCornerShape(20.dp),
+                                colors = SuggestionChipDefaults.suggestionChipColors(
+                                    containerColor = MarketplaceWhite
+                                ),
+                                border = null
+                            )
+                        }
+                    }
+                }
+            }
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
                     text = "University Marketplace",
@@ -104,6 +166,27 @@ fun HomeMarketplaceScreen(
                             border = null
                         )
                     }
+                } else {
+                    items(products.chunked(2)) { pair ->
+                        Row(
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            pair.forEach { product ->
+                                RecentProductCard(
+                                    product = product,
+                                    modifier = Modifier.weight(1f),
+                                    onClick = {
+                                        runWhenOnline(isOnline, offlineBannerController) {
+                                            onNavigateToMap(product)
+                                        }
+                                    }
+                                )
+                            }
+                            if (pair.size == 1) {
+                                Spacer(modifier = Modifier.weight(1f))
+                            }
+                        }
                 }
 
             when (val state = uiState) {
@@ -118,6 +201,15 @@ fun HomeMarketplaceScreen(
                         verticalArrangement = Arrangement.Center,
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
+                        items(products.filter { it.isFeatured }) { product ->
+                            FeaturedProductCard(
+                                product,
+                                onClick = {
+                                    runWhenOnline(isOnline, offlineBannerController) {
+                                        onNavigateToMap(product)
+                                    }
+                                }
+                            )
                         Text(text = state.message, color = Color.Red, modifier = Modifier.padding(16.dp))
                         Button(
                             onClick = { viewModel.loadListings() },
@@ -150,6 +242,21 @@ fun HomeMarketplaceScreen(
                                 SectionHeader(title = if (state.isSearching) "" else "Recent Listings", onSeeAllClick = {})
                             }
 
+                items(products.filter { !it.isFeatured }.chunked(2)) { pair ->
+                    Row(
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        pair.forEach { product ->
+                            RecentProductCard(
+                                product = product,
+                                modifier = Modifier.weight(1f),
+                                onClick = {
+                                    runWhenOnline(isOnline, offlineBannerController) {
+                                        onNavigateToMap(product)
+                                    }
+                                }
+                            )
                             items(state.recent.chunked(2)) { pair ->
                                 Row(
                                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),

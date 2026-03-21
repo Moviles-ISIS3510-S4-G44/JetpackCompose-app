@@ -31,6 +31,20 @@ import coil.compose.AsyncImage
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
+import com.google.maps.android.compose.GoogleMap
+import com.google.maps.android.compose.MapProperties
+import com.google.maps.android.compose.MapUiSettings
+import com.google.maps.android.compose.Marker
+import com.google.maps.android.compose.rememberCameraPositionState
+import com.google.maps.android.compose.rememberMarkerState
+import com.university.marketplace.ui.common.OfflineBanner
+import com.university.marketplace.ui.common.rememberOfflineBannerController
+import com.university.marketplace.ui.theme.MarketplaceBackground
+import com.university.marketplace.ui.theme.MarketplaceDark
+import com.university.marketplace.ui.theme.MarketplaceDarkSecondary
+import com.university.marketplace.ui.theme.MarketplaceGray
+import com.university.marketplace.ui.theme.MarketplaceWhite
+import com.university.marketplace.ui.theme.MarketplaceYellow
 import com.google.maps.android.compose.*
 import com.university.marketplace.ui.theme.*
 import java.util.Locale
@@ -40,12 +54,14 @@ private val DEFAULT_MAP_CENTER = LatLng(4.601, -74.065)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MapViewScreen(
+    isOnline: Boolean,
     productId: String,
     onBack: () -> Unit,
     onNavigateToDetail: (String) -> Unit,
     viewModel: MapViewModel
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val offlineBannerController = rememberOfflineBannerController(isOnline)
     val context = LocalContext.current
     val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
     var userLocation by remember { mutableStateOf<LatLng?>(null) }
@@ -96,12 +112,151 @@ fun MapViewScreen(
             )
         }
     ) { padding ->
-        Box(
+        Column(
             modifier = Modifier
                 .padding(padding)
                 .fillMaxSize()
                 .background(MarketplaceBackground)
         ) {
+            OfflineBanner(
+                isOnline = isOnline,
+                offlineBannerController = offlineBannerController
+            )
+            Box(
+                modifier = Modifier.weight(1f)
+            ) {
+                if (uiState.isLoading) {
+                    CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                    return@Box
+                }
+
+                val product = uiState.product
+                if (product == null) {
+                    Text(
+                        text = uiState.errorMessage ?: "No se pudo cargar este producto",
+                        modifier = Modifier.align(Alignment.Center),
+                        color = MarketplaceDark
+                    )
+                    return@Box
+                }
+
+                val productLocation = LatLng(product.latitude, product.longitude)
+                val cameraPositionState = rememberCameraPositionState {
+                    position = CameraPosition.fromLatLngZoom(productLocation, 15f)
+                }
+
+                GoogleMap(
+                    modifier = Modifier.fillMaxSize(),
+                    cameraPositionState = cameraPositionState,
+                    uiSettings = MapUiSettings(zoomControlsEnabled = false),
+                    properties = MapProperties(isMyLocationEnabled = uiState.hasLocationPermission)
+                ) {
+                    Marker(
+                        state = rememberMarkerState(position = productLocation),
+                        title = product.name,
+                        snippet = "${product.locationLabel} - $${product.price.toInt()}"
+                    )
+
+                    val userLat = uiState.userLatitude
+                    val userLng = uiState.userLongitude
+                    if (userLat != null && userLng != null) {
+                        Marker(
+                            state = rememberMarkerState(
+                                position = LatLng(userLat, userLng)
+                            ),
+                            title = "Tu ubicacion"
+                        )
+                    }
+                }
+
+                Card(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(16.dp)
+                        .fillMaxWidth(),
+                    shape = RoundedCornerShape(24.dp),
+                    colors = CardDefaults.cardColors(containerColor = MarketplaceWhite),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        AsyncImage(
+                            model = product.imageUrl,
+                            contentDescription = null,
+                            modifier = Modifier
+                                .size(80.dp)
+                                .clip(RoundedCornerShape(16.dp)),
+                            contentScale = ContentScale.Crop
+                        )
+
+                        Spacer(modifier = Modifier.width(16.dp))
+
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = product.name,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MarketplaceDark
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    Icons.Default.Star,
+                                    contentDescription = null,
+                                    tint = MarketplaceYellow,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Text(
+                                    text = " ${product.rating}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MarketplaceGray
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "• ${product.category}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MarketplaceGray
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    Icons.Default.Place,
+                                    contentDescription = null,
+                                    tint = MarketplaceGray,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Text(
+                                    text = " ${product.locationLabel}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MarketplaceGray
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = "$${product.price.toInt()}",
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = MarketplaceDark
+                            )
+                        }
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(MarketplaceBackground.copy(alpha = 0.5f))
+                            .padding(vertical = 8.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = uiState.distanceLabel,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MarketplaceDarkSecondary,
+                            fontWeight = FontWeight.Medium
+                        )
             when (val state = uiState) {
                 is MapUiState.Loading -> {
                     CircularProgressIndicator(modifier = Modifier.align(Alignment.Center), color = MarketplaceYellow)

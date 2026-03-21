@@ -4,8 +4,10 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
@@ -13,6 +15,7 @@ import androidx.navigation.navArgument
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.university.marketplace.connectivity.AndroidConnectivityMonitor
 import com.university.marketplace.data.FakeProductRepository
 import com.university.marketplace.data.auth.AuthRepositoryFactory
 import com.university.marketplace.data.auth.UnauthorizedAuthException
@@ -59,6 +62,10 @@ fun AppNavigation(factory: MarketplaceViewModelFactory) {
     val productRepository = remember { FakeProductRepository() }
     val authRepository = remember { AuthRepositoryFactory.create(context.applicationContext) }
     val locationRepository = remember { AndroidLocationRepository(context.applicationContext) }
+    val connectivityMonitor = remember { AndroidConnectivityMonitor(context.applicationContext) }
+    val isOnline by connectivityMonitor.isOnline.collectAsState(
+        initial = connectivityMonitor.isCurrentlyOnline()
+    )
     val startDestination = if (authRepository.hasActiveSession()) "home" else "sign_in"
     val navigateToTopLevel: (String) -> Unit = { route ->
         navController.navigate(route) {
@@ -80,6 +87,7 @@ fun AppNavigation(factory: MarketplaceViewModelFactory) {
                 factory = AuthViewModelFactory(authRepository)
             )
             SignInScreen(
+                isOnline = isOnline,
                 viewModel = authViewModel,
                 onNavigateToSignUp = {
                     navController.navigate("sign_up")
@@ -97,6 +105,7 @@ fun AppNavigation(factory: MarketplaceViewModelFactory) {
                 factory = AuthViewModelFactory(authRepository)
             )
             SignUpScreen(
+                isOnline = isOnline,
                 viewModel = authViewModel,
                 onNavigateToSignIn = {
                     navController.popBackStack()
@@ -113,7 +122,10 @@ fun AppNavigation(factory: MarketplaceViewModelFactory) {
             val homeViewModel = viewModel<HomeViewModel>(
                 factory = HomeViewModelFactory(productRepository)
             )
-            LaunchedEffect(Unit) {
+            LaunchedEffect(isOnline) {
+                if (!isOnline) {
+                    return@LaunchedEffect
+                }
                 try {
                     authRepository.getCurrentUser()
                 } catch (_: UnauthorizedAuthException) {
@@ -121,6 +133,7 @@ fun AppNavigation(factory: MarketplaceViewModelFactory) {
                 }
             }
             HomeMarketplaceScreen(
+                isOnline = isOnline,
                 viewModel = homeViewModel,
                 onNavigateToProfile = {
                     navigateToTopLevel("profile")
@@ -133,6 +146,7 @@ fun AppNavigation(factory: MarketplaceViewModelFactory) {
         composable("profile") {
             ProfileRoute(
                 authRepository = authRepository,
+                isOnline = isOnline,
                 onNavigateHome = {
                     navigateToTopLevel("home")
                 },
@@ -149,6 +163,9 @@ fun AppNavigation(factory: MarketplaceViewModelFactory) {
             if (productId != null) {
                 val mapViewModel: MapViewModel = viewModel(factory = factory)
                 MapViewScreen(
+                    isOnline = isOnline,
+                    viewModel = mapViewModel,
+                    onBack = { navController.popBackStack() }
                     productId = productId,
                     onBack = { navController.popBackStack() },
                     onNavigateToDetail = { id ->
