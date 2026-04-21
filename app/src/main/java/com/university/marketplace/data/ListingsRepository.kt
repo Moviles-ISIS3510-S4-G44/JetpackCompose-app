@@ -12,7 +12,7 @@ class ListingsRepository(
     override suspend fun getActiveListings(): List<Listing> {
         return api.getListings()
             .map { it.toDomain() }
-            .filter { it.status.equals("active", ignoreCase = true) }
+            .filter { it.status.equals("published", ignoreCase = true) }
     }
 
     override suspend fun getListingById(id: String): Listing {
