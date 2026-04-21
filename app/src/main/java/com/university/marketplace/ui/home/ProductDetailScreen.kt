@@ -21,6 +21,8 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.listSaver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
@@ -35,8 +37,14 @@ import androidx.core.content.ContextCompat
 import coil.compose.AsyncImage
 import com.google.android.gms.location.LocationServices
 import com.university.marketplace.map.DistanceUtils
+import com.university.marketplace.ui.common.isWideScreen
 import com.university.marketplace.ui.theme.*
 import java.util.Locale
+
+private val UserCoordinatesSaver = listSaver<Pair<Double, Double>?, Double>(
+    save = { value -> value?.let { listOf(it.first, it.second) } ?: emptyList() },
+    restore = { list -> if (list.size == 2) list[0] to list[1] else null }
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -48,11 +56,18 @@ fun ProductDetailScreen(
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
     val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
-    var userCoordinates by remember { mutableStateOf<Pair<Double, Double>?>(null) }
+    var userCoordinates by rememberSaveable(stateSaver = UserCoordinatesSaver) {
+        mutableStateOf<Pair<Double, Double>?>(null)
+    }
 
     LaunchedEffect(productId) {
-        viewModel.loadListing(productId)
+        if (uiState is ListingDetailUiState.Loading) {
+            viewModel.loadListing(productId)
+        }
+    }
 
+    LaunchedEffect(Unit) {
+        if (userCoordinates != null) return@LaunchedEffect
         val hasFineLocation = ContextCompat.checkSelfPermission(
             context,
             Manifest.permission.ACCESS_FINE_LOCATION
@@ -139,103 +154,159 @@ fun ProductDetailScreen(
                 }
                 is ListingDetailUiState.Success -> {
                     val listing = state.listing
-                    val distanceText = if (listing.latitude != null && listing.longitude != null) {
-                        userCoordinates?.let { (lat, lon) ->
-                            val distanceKm = DistanceUtils.calculateDistance(
-                                lat,
-                                lon,
-                                listing.latitude,
-                                listing.longitude
-                            )
-                            String.format(Locale.US, "%s • %.1f km away", listing.locationName, distanceKm)
-                        } ?: "${listing.locationName} • distance unavailable"
-                    } else {
-                        "${listing.locationName} • location unavailable"
-                    }
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(Color.White)
-                            .verticalScroll(rememberScrollState())
-                    ) {
-                        AsyncImage(
-                            model = listing.imageUrl,
-                            contentDescription = listing.name,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(350.dp),
-                            contentScale = ContentScale.Crop
-                        )
-
-                        Column(modifier = Modifier.padding(20.dp)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    text = listing.name,
-                                    style = MaterialTheme.typography.headlineSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.weight(1f)
+                    val distanceText = remember(listing, userCoordinates) {
+                        if (listing.latitude != null && listing.longitude != null) {
+                            userCoordinates?.let { (lat, lon) ->
+                                val distanceKm = DistanceUtils.calculateDistance(
+                                    lat,
+                                    lon,
+                                    listing.latitude,
+                                    listing.longitude
                                 )
-                                Surface(
-                                    color = Color(0xFFF5F5F5),
-                                    shape = RoundedCornerShape(8.dp)
-                                ) {
-                                    Text(
-                                        text = listing.condition.uppercase(),
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                            }
-
-                            Text(
-                                text = "$${listing.price.toInt()}",
-                                color = MarketplaceYellow,
-                                style = MaterialTheme.typography.headlineMedium,
-                                fontWeight = FontWeight.ExtraBold,
-                                modifier = Modifier.padding(vertical = 8.dp)
-                            )
-
-                            HorizontalDivider(
-                                modifier = Modifier.padding(vertical = 12.dp),
-                                thickness = DividerDefaults.Thickness,
-                                color = Color.LightGray.copy(alpha = 0.5f)
-                            )
-
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Box(modifier = Modifier.size(48.dp).clip(CircleShape).background(Color.LightGray))
-                                Column(modifier = Modifier.padding(start = 12.dp).weight(1f)) {
-                                    Text(listing.sellerName, fontWeight = FontWeight.Bold)
-                                    Text("University Student", fontSize = 12.sp, color = Color.Gray)
-                                }
-                                Text("View Profile", color = MarketplaceYellow, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                            }
-
-                            Spacer(modifier = Modifier.height(24.dp))
-
-                            Text("Description", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
-                            Text(
-                                text = listing.description,
-                                modifier = Modifier.padding(top = 8.dp),
-                                color = Color.DarkGray,
-                                lineHeight = 22.sp
-                            )
-
-                            Spacer(modifier = Modifier.height(20.dp))
-
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.LocationOn, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(18.dp))
-                                Text(
-                                    text = distanceText,
-                                    modifier = Modifier.padding(start = 8.dp),
-                                    color = Color.Gray,
-                                    fontSize = 14.sp
-                                )
-                            }
+                                String.format(Locale.US, "%s • %.1f km away", listing.locationName, distanceKm)
+                            } ?: "${listing.locationName} • distance unavailable"
+                        } else {
+                            "${listing.locationName} • location unavailable"
                         }
+                    }
+                    if (isWideScreen()) {
+                        WideListingDetail(
+                            listing = listing,
+                            distanceText = distanceText
+                        )
+                    } else {
+                        CompactListingDetail(
+                            listing = listing,
+                            distanceText = distanceText
+                        )
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun CompactListingDetail(
+    listing: ListingUiModel,
+    distanceText: String
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.White)
+            .verticalScroll(rememberScrollState())
+    ) {
+        AsyncImage(
+            model = listing.imageUrl,
+            contentDescription = listing.name,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(350.dp),
+            contentScale = ContentScale.Crop
+        )
+        ListingDetailBody(listing = listing, distanceText = distanceText)
+    }
+}
+
+@Composable
+private fun WideListingDetail(
+    listing: ListingUiModel,
+    distanceText: String
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.White)
+    ) {
+        AsyncImage(
+            model = listing.imageUrl,
+            contentDescription = listing.name,
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxHeight(),
+            contentScale = ContentScale.Crop
+        )
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxHeight()
+                .verticalScroll(rememberScrollState())
+        ) {
+            ListingDetailBody(listing = listing, distanceText = distanceText)
+        }
+    }
+}
+
+@Composable
+private fun ListingDetailBody(
+    listing: ListingUiModel,
+    distanceText: String
+) {
+    Column(modifier = Modifier.padding(20.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = listing.name,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.weight(1f)
+            )
+            Surface(
+                color = Color(0xFFF5F5F5),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Text(
+                    text = listing.condition.uppercase(),
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+
+        Text(
+            text = "$${listing.price.toInt()}",
+            color = MarketplaceYellow,
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.ExtraBold,
+            modifier = Modifier.padding(vertical = 8.dp)
+        )
+
+        HorizontalDivider(
+            modifier = Modifier.padding(vertical = 12.dp),
+            thickness = DividerDefaults.Thickness,
+            color = Color.LightGray.copy(alpha = 0.5f)
+        )
+
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(modifier = Modifier.size(48.dp).clip(CircleShape).background(Color.LightGray))
+            Column(modifier = Modifier.padding(start = 12.dp).weight(1f)) {
+                Text(listing.sellerName, fontWeight = FontWeight.Bold)
+                Text("University Student", fontSize = 12.sp, color = Color.Gray)
+            }
+            Text("View Profile", color = MarketplaceYellow, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        Text("Description", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+        Text(
+            text = listing.description,
+            modifier = Modifier.padding(top = 8.dp),
+            color = Color.DarkGray,
+            lineHeight = 22.sp
+        )
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Default.LocationOn, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(18.dp))
+            Text(
+                text = distanceText,
+                modifier = Modifier.padding(start = 8.dp),
+                color = Color.Gray,
+                fontSize = 14.sp
+            )
         }
     }
 }

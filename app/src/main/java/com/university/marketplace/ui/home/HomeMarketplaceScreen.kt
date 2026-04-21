@@ -14,8 +14,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -190,19 +193,28 @@ fun HomeMarketplaceScreen(
                     }
                 }
                 is HomeUiState.Success -> {
-                    LazyColumn(modifier = Modifier.fillMaxSize()) {
-                        // Featured Section
+                    LazyVerticalGrid(
+                        columns = GridCells.Adaptive(minSize = 160.dp),
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
                         if (state.featured.isNotEmpty()) {
-                            item {
+                            item(span = { GridItemSpan(maxLineSpan) }) {
                                 SectionHeader(
                                     title = if (state.isSearching) "Search Results" else "Featured",
                                     onSeeAllClick = {}
                                 )
+                            }
+                            item(span = { GridItemSpan(maxLineSpan) }) {
                                 LazyRow(
-                                    contentPadding = PaddingValues(horizontal = 16.dp),
                                     horizontalArrangement = Arrangement.spacedBy(16.dp)
                                 ) {
-                                    items(state.featured) { listing ->
+                                    items(
+                                        items = state.featured,
+                                        key = { it.id }
+                                    ) { listing ->
                                         FeaturedProductCard(
                                             listing = listing,
                                             onClick = { onNavigateToDetail(listing.id) }
@@ -212,36 +224,27 @@ fun HomeMarketplaceScreen(
                             }
                         }
 
-                        // Recent Listings Section
                         if (state.recent.isNotEmpty()) {
-                            item {
+                            item(span = { GridItemSpan(maxLineSpan) }) {
                                 SectionHeader(
                                     title = if (state.isSearching) "" else "Recent Listings",
                                     onSeeAllClick = {}
                                 )
                             }
 
-                            items(state.recent.chunked(2)) { pair ->
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(16.dp)
-                                ) {
-                                    pair.forEach { listing ->
-                                        RecentProductCard(
-                                            listing = listing,
-                                            modifier = Modifier.weight(1f),
-                                            onClick = { onNavigateToDetail(listing.id) }
-                                        )
-                                    }
-                                    if (pair.size == 1) {
-                                        Spacer(modifier = Modifier.weight(1f))
-                                    }
-                                }
+                            items(
+                                items = state.recent,
+                                key = { it.id }
+                            ) { listing ->
+                                RecentProductCard(
+                                    listing = listing,
+                                    onClick = { onNavigateToDetail(listing.id) }
+                                )
                             }
                         }
 
                         if (state.featured.isEmpty() && state.recent.isEmpty()) {
-                            item {
+                            item(span = { GridItemSpan(maxLineSpan) }) {
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -253,7 +256,9 @@ fun HomeMarketplaceScreen(
                             }
                         }
 
-                        item { Spacer(modifier = Modifier.height(16.dp)) }
+                        item(span = { GridItemSpan(maxLineSpan) }) {
+                            Spacer(modifier = Modifier.height(16.dp))
+                        }
                     }
                 }
             }
@@ -267,7 +272,7 @@ fun SectionHeader(title: String, onSeeAllClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(16.dp),
+            .padding(vertical = 8.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {

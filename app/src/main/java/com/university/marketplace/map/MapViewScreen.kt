@@ -4,16 +4,20 @@ import android.Manifest
 import android.content.pm.PackageManager
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -35,6 +39,8 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.listSaver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -55,6 +61,7 @@ import com.google.maps.android.compose.Marker
 import com.google.maps.android.compose.rememberCameraPositionState
 import com.google.maps.android.compose.rememberMarkerState
 import com.university.marketplace.ui.common.OfflineBanner
+import com.university.marketplace.ui.common.isWideScreen
 import com.university.marketplace.ui.common.rememberOfflineBannerController
 import com.university.marketplace.ui.theme.MarketplaceBackground
 import com.university.marketplace.ui.theme.MarketplaceDark
@@ -65,6 +72,11 @@ import com.university.marketplace.ui.theme.MarketplaceYellow
 import java.util.Locale
 
 private val DEFAULT_MAP_CENTER = LatLng(4.601, -74.065)
+
+private val LatLngSaver = listSaver<LatLng?, Double>(
+    save = { value -> value?.let { listOf(it.latitude, it.longitude) } ?: emptyList() },
+    restore = { list -> if (list.size == 2) LatLng(list[0], list[1]) else null }
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -80,11 +92,18 @@ fun MapViewScreen(
 
     val context = LocalContext.current
     val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
-    var userLocation by remember { mutableStateOf<LatLng?>(null) }
+    var userLocation by rememberSaveable(stateSaver = LatLngSaver) {
+        mutableStateOf<LatLng?>(null)
+    }
 
     LaunchedEffect(productId) {
-        viewModel.loadListing(productId)
+        if (uiState is MapUiState.Loading) {
+            viewModel.loadListing(productId)
+        }
+    }
 
+    LaunchedEffect(Unit) {
+        if (userLocation != null) return@LaunchedEffect
         val hasFineLocation = ContextCompat.checkSelfPermission(
             context,
             Manifest.permission.ACCESS_FINE_LOCATION
@@ -158,126 +177,205 @@ fun MapViewScreen(
                     }
                     is MapUiState.Success -> {
                         val listing = state.listing
-                        val listingLocation = listing.latitude?.let { lat ->
-                            listing.longitude?.let { lng -> LatLng(lat, lng) }
-                        }
-                        val distanceText = userLocation?.let { current ->
-                            listingLocation?.let {
-                                val distanceKm = DistanceUtils.calculateDistance(
-                                    current.latitude,
-                                    current.longitude,
-                                    it.latitude,
-                                    it.longitude
-                                )
-                                String.format(Locale.US, "Approx. %.1f km from you", distanceKm)
+                        val listingLocation = remember(listing.latitude, listing.longitude) {
+                            listing.latitude?.let { lat ->
+                                listing.longitude?.let { lng -> LatLng(lat, lng) }
                             }
-                        } ?: "Location unavailable"
+                        }
+                        val distanceText = remember(userLocation, listingLocation) {
+                            userLocation?.let { current ->
+                                listingLocation?.let {
+                                    val distanceKm = DistanceUtils.calculateDistance(
+                                        current.latitude,
+                                        current.longitude,
+                                        it.latitude,
+                                        it.longitude
+                                    )
+                                    String.format(Locale.US, "Approx. %.1f km from you", distanceKm)
+                                }
+                            } ?: "Location unavailable"
+                        }
 
                         val cameraPositionState = rememberCameraPositionState {
-                            position = CameraPosition.fromLatLngZoom(listingLocation ?: DEFAULT_MAP_CENTER, 15f)
+                            position = CameraPosition.fromLatLngZoom(
+                                listingLocation ?: DEFAULT_MAP_CENTER,
+                                15f
+                            )
                         }
 
-                        GoogleMap(
-                            modifier = Modifier.fillMaxSize(),
-                            cameraPositionState = cameraPositionState,
-                            uiSettings = MapUiSettings(zoomControlsEnabled = false)
-                        ) {
-                            listingLocation?.let {
-                                Marker(
-                                    state = rememberMarkerState(position = it),
-                                    title = listing.name,
-                                    snippet = "$${listing.price.toInt()}"
-                                )
-                            }
-
-                            userLocation?.let {
-                                Marker(
-                                    state = rememberMarkerState(position = it),
-                                    title = "You"
-                                )
-                            }
-                        }
-
-                        Card(
-                            modifier = Modifier
-                                .align(Alignment.BottomCenter)
-                                .padding(16.dp)
-                                .fillMaxWidth()
-                                .clickable { onNavigateToDetail(listing.id) },
-                            shape = RoundedCornerShape(24.dp),
-                            colors = CardDefaults.cardColors(containerColor = MarketplaceWhite),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(16.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                AsyncImage(
-                                    model = listing.imageUrl,
-                                    contentDescription = null,
+                        if (isWideScreen()) {
+                            Row(modifier = Modifier.fillMaxSize()) {
+                                Box(
                                     modifier = Modifier
-                                        .size(80.dp)
-                                        .clip(RoundedCornerShape(16.dp)),
-                                    contentScale = ContentScale.Crop
-                                )
-
-                                Spacer(modifier = Modifier.width(16.dp))
-
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = listing.name,
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MarketplaceDark
+                                        .weight(1f)
+                                        .fillMaxHeight()
+                                ) {
+                                    MapContent(
+                                        cameraPositionState = cameraPositionState,
+                                        listingLocation = listingLocation,
+                                        userLocation = userLocation,
+                                        listing = listing,
+                                        modifier = Modifier.fillMaxSize()
                                     )
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(
-                                            Icons.Default.Star,
-                                            contentDescription = null,
-                                            tint = MarketplaceYellow,
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                        Text(
-                                            text = " ${listing.rating}",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MarketplaceGray
-                                        )
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text(
-                                            text = "• ${listing.category}",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MarketplaceGray
-                                        )
-                                    }
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    Text(
-                                        text = "$${listing.price.toInt()}",
-                                        style = MaterialTheme.typography.titleLarge,
-                                        fontWeight = FontWeight.ExtraBold,
-                                        color = MarketplaceDark
+                                }
+                                Box(
+                                    modifier = Modifier
+                                        .widthIn(min = 280.dp, max = 360.dp)
+                                        .fillMaxHeight()
+                                        .padding(16.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    ListingSummaryCard(
+                                        listing = listing,
+                                        distanceText = distanceText,
+                                        onClick = { onNavigateToDetail(listing.id) }
                                     )
                                 }
                             }
+                        } else {
+                            MapContent(
+                                cameraPositionState = cameraPositionState,
+                                listingLocation = listingLocation,
+                                userLocation = userLocation,
+                                listing = listing,
+                                modifier = Modifier.fillMaxSize()
+                            )
 
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .background(MarketplaceBackground.copy(alpha = 0.5f))
-                                    .padding(vertical = 8.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = distanceText,
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MarketplaceDarkSecondary,
-                                    fontWeight = FontWeight.Medium
+                            BottomCardWrapper {
+                                ListingSummaryCard(
+                                    listing = listing,
+                                    distanceText = distanceText,
+                                    onClick = { onNavigateToDetail(listing.id) }
                                 )
                             }
                         }
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun BoxScope.BottomCardWrapper(content: @Composable () -> Unit) {
+    Box(
+        modifier = Modifier
+            .align(Alignment.BottomCenter)
+            .padding(16.dp)
+    ) {
+        content()
+    }
+}
+
+@Composable
+private fun MapContent(
+    cameraPositionState: com.google.maps.android.compose.CameraPositionState,
+    listingLocation: LatLng?,
+    userLocation: LatLng?,
+    listing: com.university.marketplace.ui.home.ListingUiModel,
+    modifier: Modifier = Modifier
+) {
+    GoogleMap(
+        modifier = modifier,
+        cameraPositionState = cameraPositionState,
+        uiSettings = MapUiSettings(zoomControlsEnabled = false)
+    ) {
+        listingLocation?.let {
+            Marker(
+                state = rememberMarkerState(position = it),
+                title = listing.name,
+                snippet = "$${listing.price.toInt()}"
+            )
+        }
+
+        userLocation?.let {
+            Marker(
+                state = rememberMarkerState(position = it),
+                title = "You"
+            )
+        }
+    }
+}
+
+@Composable
+private fun ListingSummaryCard(
+    listing: com.university.marketplace.ui.home.ListingUiModel,
+    distanceText: String,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() },
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = MarketplaceWhite),
+        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            AsyncImage(
+                model = listing.imageUrl,
+                contentDescription = null,
+                modifier = Modifier
+                    .size(80.dp)
+                    .clip(RoundedCornerShape(16.dp)),
+                contentScale = ContentScale.Crop
+            )
+
+            Spacer(modifier = Modifier.width(16.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = listing.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MarketplaceDark
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Default.Star,
+                        contentDescription = null,
+                        tint = MarketplaceYellow,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Text(
+                        text = " ${listing.rating}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MarketplaceGray
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "• ${listing.category}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MarketplaceGray
+                    )
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "$${listing.price.toInt()}",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = MarketplaceDark
+                )
+            }
+        }
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(MarketplaceBackground.copy(alpha = 0.5f))
+                .padding(vertical = 8.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = distanceText,
+                style = MaterialTheme.typography.labelMedium,
+                color = MarketplaceDarkSecondary,
+                fontWeight = FontWeight.Medium
+            )
         }
     }
 }

@@ -1,6 +1,7 @@
 package com.university.marketplace
 
 import android.os.Bundle
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -19,6 +20,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.university.marketplace.di.DefaultAppContainer
+import com.university.marketplace.data.auth.AuthException
 import com.university.marketplace.data.auth.AuthRepositoryFactory
 import com.university.marketplace.data.auth.UnauthorizedAuthException
 import com.university.marketplace.connectivity.AndroidConnectivityMonitor
@@ -126,10 +128,15 @@ fun AppNavigation(factory: MarketplaceViewModelFactory) {
         composable("home") {
             val homeViewModel: HomeViewModel = viewModel(factory = factory)
             LaunchedEffect(Unit) {
+                if (!isOnline) return@LaunchedEffect
                 try {
                     authRepository.getCurrentUser()
                 } catch (_: UnauthorizedAuthException) {
                     onUnauthorized()
+                } catch (error: AuthException) {
+                    Log.w("MainActivity", "Failed to verify session on home.", error)
+                } catch (error: Throwable) {
+                    Log.w("MainActivity", "Unexpected error verifying session on home.", error)
                 }
             }
             HomeMarketplaceScreen(
