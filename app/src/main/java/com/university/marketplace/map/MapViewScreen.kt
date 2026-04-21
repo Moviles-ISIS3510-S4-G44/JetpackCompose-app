@@ -96,10 +96,15 @@ fun MapViewScreen(
         mutableStateOf<LatLng?>(null)
     }
 
-    LaunchedEffect(productId) {
-        if (uiState is MapUiState.Loading) {
-            viewModel.loadListing(productId)
+    LaunchedEffect(productId, isOnline) {
+        val currentState = uiState
+        if (currentState is MapUiState.Success) return@LaunchedEffect
+        if (!isOnline) {
+            viewModel.showOfflineState()
+            return@LaunchedEffect
         }
+        viewModel.resetToLoading()
+        viewModel.loadListing(productId)
     }
 
     LaunchedEffect(Unit) {

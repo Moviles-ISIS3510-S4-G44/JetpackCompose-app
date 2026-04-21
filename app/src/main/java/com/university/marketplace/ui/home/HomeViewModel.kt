@@ -2,6 +2,7 @@ package com.university.marketplace.ui.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.university.marketplace.data.toUserFriendlyMessage
 import com.university.marketplace.domain.Listing
 import com.university.marketplace.domain.usecase.GetActiveListingsUseCase
 import com.university.marketplace.domain.usecase.SearchListingsByRelevanceUseCase
@@ -23,10 +24,6 @@ class HomeViewModel(
 
     private var allListings: List<Listing> = emptyList()
 
-    init {
-        loadListings()
-    }
-
     fun loadListings() {
         viewModelScope.launch {
             _uiState.value = HomeUiState.Loading
@@ -34,9 +31,18 @@ class HomeViewModel(
                 allListings = getActiveListingsUseCase()
                 updateSections(allListings.map { it.toUiModel() })
             } catch (e: Exception) {
-                _uiState.value = HomeUiState.Error(e.message ?: "An unknown error occurred")
+                _uiState.value = HomeUiState.Error(
+                    e.toUserFriendlyMessage(fallback = "An unknown error occurred")
+                )
             }
         }
+    }
+
+    fun showOfflineState() {
+        if (_uiState.value is HomeUiState.Success) return
+        _uiState.value = HomeUiState.Error(
+            "You appear to be offline. Please check your connection and try again."
+        )
     }
 
     private fun updateSections(listings: List<ListingUiModel>) {

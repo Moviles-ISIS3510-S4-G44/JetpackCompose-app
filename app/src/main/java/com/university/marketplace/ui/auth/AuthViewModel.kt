@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.university.marketplace.BuildConfig
 import com.university.marketplace.data.auth.AuthException
 import com.university.marketplace.data.auth.AuthRepository
+import com.university.marketplace.data.isNetworkConnectivityError
 import com.university.marketplace.domain.AuthenticatedUser
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -90,6 +91,9 @@ class AuthViewModel(
     }
 
     private fun Throwable.toUserMessage(): String {
+        if (isNetworkConnectivityError()) {
+            return "You appear to be offline. Please check your connection and try again."
+        }
         val fallback = "We could not connect to the server. Check the API base URL and try again."
         return when (this) {
             is AuthException -> message ?: "We could not complete the request."

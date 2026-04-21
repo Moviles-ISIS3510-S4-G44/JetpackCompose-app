@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -58,6 +59,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.university.marketplace.ui.common.OfflineBanner
+import com.university.marketplace.ui.common.OfflineBannerController
+import com.university.marketplace.ui.common.isWideScreen
 import com.university.marketplace.ui.common.rememberOfflineBannerController
 import com.university.marketplace.ui.common.runWhenOnline
 import com.university.marketplace.ui.theme.MarketplaceDark
@@ -168,220 +171,412 @@ private fun AuthRoute(
         }
     }
 
+    val onSubmit: () -> Unit = {
+        val error = validateForm(
+            name = name,
+            email = email,
+            password = password,
+            requiresName = showNameField
+        )
+        if (error != null) {
+            validationMessage = error
+            coroutineScope.launch {
+                snackbarHostState.showSnackbar(error)
+            }
+        } else {
+            runWhenOnline(isOnline, offlineBannerController) {
+                onPrimaryAction(name.trim(), email.trim(), password, persistSession)
+            }
+        }
+    }
+
     Scaffold(
         containerColor = MarketplaceWhite,
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
     ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(MarketplaceWhite)
-                .verticalScroll(rememberScrollState())
-                .padding(paddingValues),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
+        if (isWideScreen()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MarketplaceWhite)
+                    .padding(paddingValues)
+            ) {
+                AuthBrandPane(
+                    title = title,
+                    subtitle = subtitle,
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                )
+                AuthFormPane(
+                    isOnline = isOnline,
+                    offlineBannerController = offlineBannerController,
+                    showNameField = showNameField,
+                    name = name,
+                    onNameChange = { name = it; validationMessage = null },
+                    email = email,
+                    onEmailChange = { email = it; validationMessage = null },
+                    password = password,
+                    onPasswordChange = { password = it; validationMessage = null },
+                    passwordVisible = passwordVisible,
+                    onPasswordVisibilityChanged = { passwordVisible = !passwordVisible },
+                    persistSession = persistSession,
+                    onPersistSessionChange = { persistSession = it },
+                    validationMessage = validationMessage,
+                    isLoading = uiState.isLoading,
+                    primaryActionLabel = primaryActionLabel,
+                    secondaryPrompt = secondaryPrompt,
+                    secondaryActionLabel = secondaryActionLabel,
+                    onPrimaryAction = onSubmit,
+                    onSecondaryAction = onSecondaryAction,
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                )
+            }
+        } else {
             Column(
                 modifier = Modifier
-                    .widthIn(max = 480.dp)
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp, vertical = 20.dp)
+                    .fillMaxSize()
+                    .background(MarketplaceWhite)
+                    .verticalScroll(rememberScrollState())
+                    .padding(paddingValues),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                BrandHeader()
-                Spacer(modifier = Modifier.height(28.dp))
+                Column(
+                    modifier = Modifier
+                        .widthIn(max = 480.dp)
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp, vertical = 20.dp)
+                ) {
+                    BrandHeader()
+                    Spacer(modifier = Modifier.height(28.dp))
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MarketplaceDark
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = AuthSupportingTextColor
+                    )
+                    Spacer(modifier = Modifier.height(28.dp))
+                    AuthFormBody(
+                        isOnline = isOnline,
+                        offlineBannerController = offlineBannerController,
+                        showNameField = showNameField,
+                        name = name,
+                        onNameChange = { name = it; validationMessage = null },
+                        email = email,
+                        onEmailChange = { email = it; validationMessage = null },
+                        password = password,
+                        onPasswordChange = { password = it; validationMessage = null },
+                        passwordVisible = passwordVisible,
+                        onPasswordVisibilityChanged = { passwordVisible = !passwordVisible },
+                        persistSession = persistSession,
+                        onPersistSessionChange = { persistSession = it },
+                        validationMessage = validationMessage,
+                        isLoading = uiState.isLoading,
+                        primaryActionLabel = primaryActionLabel,
+                        secondaryPrompt = secondaryPrompt,
+                        secondaryActionLabel = secondaryActionLabel,
+                        onPrimaryAction = onSubmit,
+                        onSecondaryAction = onSecondaryAction
+                    )
+                }
+
+                AuthFooter(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 36.dp, bottom = 16.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AuthBrandPane(
+    title: String,
+    subtitle: String,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .background(MarketplaceWhite)
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 32.dp, vertical = 32.dp),
+        verticalArrangement = Arrangement.SpaceBetween
+    ) {
+        Column {
+            BrandHeader()
+            Spacer(modifier = Modifier.height(40.dp))
+            Text(
+                text = title,
+                style = MaterialTheme.typography.displaySmall,
+                fontWeight = FontWeight.Bold,
+                color = MarketplaceDark
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodyLarge,
+                color = AuthSupportingTextColor
+            )
+        }
+        AuthFooter(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 32.dp),
+            center = false
+        )
+    }
+}
+
+@Composable
+private fun AuthFormPane(
+    isOnline: Boolean,
+    offlineBannerController: OfflineBannerController,
+    showNameField: Boolean,
+    name: String,
+    onNameChange: (String) -> Unit,
+    email: String,
+    onEmailChange: (String) -> Unit,
+    password: String,
+    onPasswordChange: (String) -> Unit,
+    passwordVisible: Boolean,
+    onPasswordVisibilityChanged: () -> Unit,
+    persistSession: Boolean,
+    onPersistSessionChange: (Boolean) -> Unit,
+    validationMessage: String?,
+    isLoading: Boolean,
+    primaryActionLabel: String,
+    secondaryPrompt: String,
+    secondaryActionLabel: String,
+    onPrimaryAction: () -> Unit,
+    onSecondaryAction: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .background(MarketplaceWhite)
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 32.dp, vertical = 32.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            modifier = Modifier
+                .widthIn(max = 440.dp)
+                .fillMaxWidth()
+        ) {
+            AuthFormBody(
+                isOnline = isOnline,
+                offlineBannerController = offlineBannerController,
+                showNameField = showNameField,
+                name = name,
+                onNameChange = onNameChange,
+                email = email,
+                onEmailChange = onEmailChange,
+                password = password,
+                onPasswordChange = onPasswordChange,
+                passwordVisible = passwordVisible,
+                onPasswordVisibilityChanged = onPasswordVisibilityChanged,
+                persistSession = persistSession,
+                onPersistSessionChange = onPersistSessionChange,
+                validationMessage = validationMessage,
+                isLoading = isLoading,
+                primaryActionLabel = primaryActionLabel,
+                secondaryPrompt = secondaryPrompt,
+                secondaryActionLabel = secondaryActionLabel,
+                onPrimaryAction = onPrimaryAction,
+                onSecondaryAction = onSecondaryAction
+            )
+        }
+    }
+}
+
+@Composable
+private fun AuthFormBody(
+    isOnline: Boolean,
+    offlineBannerController: OfflineBannerController,
+    showNameField: Boolean,
+    name: String,
+    onNameChange: (String) -> Unit,
+    email: String,
+    onEmailChange: (String) -> Unit,
+    password: String,
+    onPasswordChange: (String) -> Unit,
+    passwordVisible: Boolean,
+    onPasswordVisibilityChanged: () -> Unit,
+    persistSession: Boolean,
+    onPersistSessionChange: (Boolean) -> Unit,
+    validationMessage: String?,
+    isLoading: Boolean,
+    primaryActionLabel: String,
+    secondaryPrompt: String,
+    secondaryActionLabel: String,
+    onPrimaryAction: () -> Unit,
+    onSecondaryAction: () -> Unit
+) {
+    Column {
+        OfflineBanner(
+            isOnline = isOnline,
+            offlineBannerController = offlineBannerController
+        )
+        if (!isOnline && !offlineBannerController.isDismissed) {
+            Spacer(modifier = Modifier.height(20.dp))
+        }
+
+        if (showNameField) {
+            AuthFieldLabel(text = "FULL NAME")
+            OutlinedAuthField(
+                value = name,
+                onValueChange = onNameChange,
+                placeholder = "Alex Johnson",
+                keyboardType = KeyboardType.Text
+            )
+            Spacer(modifier = Modifier.height(18.dp))
+        }
+
+        AuthFieldLabel(text = "UNIVERSITY EMAIL")
+        OutlinedAuthField(
+            value = email,
+            onValueChange = onEmailChange,
+            placeholder = "student@university.edu",
+            keyboardType = KeyboardType.Email
+        )
+        Spacer(modifier = Modifier.height(18.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            AuthFieldLabel(text = "PASSWORD")
+            if (!showNameField) {
                 Text(
-                    text = title,
-                    style = MaterialTheme.typography.headlineMedium,
+                    text = "Forgot password?",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = AuthSupportingTextColor
+                )
+            }
+        }
+        OutlinedAuthField(
+            value = password,
+            onValueChange = onPasswordChange,
+            placeholder = "••••••••",
+            keyboardType = KeyboardType.Password,
+            isPassword = true,
+            passwordVisible = passwordVisible,
+            onPasswordVisibilityChanged = onPasswordVisibilityChanged
+        )
+        Spacer(modifier = Modifier.height(18.dp))
+
+        RememberSessionToggle(
+            checked = persistSession,
+            onCheckedChange = onPersistSessionChange
+        )
+
+        validationMessage?.let { message ->
+            Spacer(modifier = Modifier.height(14.dp))
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color(0xFFB3261E)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        Button(
+            onClick = onPrimaryAction,
+            enabled = !isLoading,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MarketplaceYellow,
+                contentColor = MarketplaceDark,
+                disabledContainerColor = MarketplaceYellow.copy(alpha = 0.6f),
+                disabledContentColor = MarketplaceDark.copy(alpha = 0.8f)
+            ),
+            shape = RoundedCornerShape(14.dp)
+        ) {
+            if (isLoading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(22.dp),
+                    color = MarketplaceDark,
+                    strokeWidth = 2.dp
+                )
+            } else {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        text = primaryActionLabel,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.sp
+                    )
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Outlined.ArrowRightAlt,
+                        contentDescription = null
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(28.dp))
+        AuthDivider(text = if (showNameField) "ACADEMIC ACCOUNT" else "ACADEMIC SIGN-IN")
+        Spacer(modifier = Modifier.height(24.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = secondaryPrompt,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MarketplaceDark
+            )
+            TextButton(onClick = onSecondaryAction) {
+                Text(
+                    text = secondaryActionLabel,
+                    style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.Bold,
                     color = MarketplaceDark
                 )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = AuthSupportingTextColor
-                )
-                Spacer(modifier = Modifier.height(28.dp))
-                OfflineBanner(
-                    isOnline = isOnline,
-                    offlineBannerController = offlineBannerController
-                )
-                if (!isOnline && !offlineBannerController.isDismissed) {
-                    Spacer(modifier = Modifier.height(20.dp))
-                }
-
-                if (showNameField) {
-                    AuthFieldLabel(text = "FULL NAME")
-                    OutlinedAuthField(
-                        value = name,
-                        onValueChange = {
-                            name = it
-                            validationMessage = null
-                        },
-                        placeholder = "Alex Johnson",
-                        keyboardType = KeyboardType.Text
-                    )
-                    Spacer(modifier = Modifier.height(18.dp))
-                }
-
-                AuthFieldLabel(text = "UNIVERSITY EMAIL")
-                OutlinedAuthField(
-                    value = email,
-                    onValueChange = {
-                        email = it
-                        validationMessage = null
-                    },
-                    placeholder = "student@university.edu",
-                    keyboardType = KeyboardType.Email
-                )
-                Spacer(modifier = Modifier.height(18.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    AuthFieldLabel(text = "PASSWORD")
-                    if (!showNameField) {
-                        Text(
-                            text = "Forgot password?",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = AuthSupportingTextColor
-                        )
-                    }
-                }
-                OutlinedAuthField(
-                    value = password,
-                    onValueChange = {
-                        password = it
-                        validationMessage = null
-                    },
-                    placeholder = "••••••••",
-                    keyboardType = KeyboardType.Password,
-                    isPassword = true,
-                    passwordVisible = passwordVisible,
-                    onPasswordVisibilityChanged = {
-                        passwordVisible = !passwordVisible
-                    }
-                )
-                Spacer(modifier = Modifier.height(18.dp))
-
-                RememberSessionToggle(
-                    checked = persistSession,
-                    onCheckedChange = { persistSession = it }
-                )
-
-                validationMessage?.let { message ->
-                    Spacer(modifier = Modifier.height(14.dp))
-                    Text(
-                        text = message,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color(0xFFB3261E)
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(24.dp))
-
-                Button(
-                    onClick = {
-                        val error = validateForm(
-                            name = name,
-                            email = email,
-                            password = password,
-                            requiresName = showNameField
-                        )
-                        if (error != null) {
-                            validationMessage = error
-                            coroutineScope.launch {
-                                snackbarHostState.showSnackbar(error)
-                            }
-                        } else {
-                            runWhenOnline(isOnline, offlineBannerController) {
-                                onPrimaryAction(name.trim(), email.trim(), password, persistSession)
-                            }
-                        }
-                    },
-                    enabled = !uiState.isLoading,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MarketplaceYellow,
-                        contentColor = MarketplaceDark,
-                        disabledContainerColor = MarketplaceYellow.copy(alpha = 0.6f),
-                        disabledContentColor = MarketplaceDark.copy(alpha = 0.8f)
-                    ),
-                    shape = RoundedCornerShape(14.dp)
-                ) {
-                    if (uiState.isLoading) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(22.dp),
-                            color = MarketplaceDark,
-                            strokeWidth = 2.dp
-                        )
-                    } else {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            Text(
-                                text = primaryActionLabel,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 1.sp
-                            )
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Outlined.ArrowRightAlt,
-                                contentDescription = null
-                            )
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(28.dp))
-                AuthDivider(text = if (showNameField) "ACADEMIC ACCOUNT" else "ACADEMIC SIGN-IN")
-                Spacer(modifier = Modifier.height(24.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = secondaryPrompt,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MarketplaceDark
-                    )
-                    TextButton(onClick = onSecondaryAction) {
-                        Text(
-                            text = secondaryActionLabel,
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = MarketplaceDark
-                        )
-                    }
-                }
             }
+        }
+    }
+}
 
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 36.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(20.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "PRIVACY POLICY",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = AuthSupportingTextColor
-                    )
-                    Text(
-                        text = "TERMS OF SERVICE",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = AuthSupportingTextColor
-                    )
-                }
-            }
+@Composable
+private fun AuthFooter(
+    modifier: Modifier = Modifier,
+    center: Boolean = true
+) {
+    Column(
+        modifier = modifier,
+        horizontalAlignment = if (center) Alignment.CenterHorizontally else Alignment.Start
+    ) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(20.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "PRIVACY POLICY",
+                style = MaterialTheme.typography.labelMedium,
+                color = AuthSupportingTextColor
+            )
+            Text(
+                text = "TERMS OF SERVICE",
+                style = MaterialTheme.typography.labelMedium,
+                color = AuthSupportingTextColor
+            )
         }
     }
 }

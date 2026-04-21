@@ -52,6 +52,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -81,6 +82,17 @@ fun HomeMarketplaceScreen(
     val uiState by viewModel.uiState.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
     val categories = listOf("Books", "Electronics", "Furniture", "Study")
+
+    LaunchedEffect(isOnline) {
+        val currentState = uiState
+        if (isOnline) {
+            if (currentState is HomeUiState.Loading || currentState is HomeUiState.Error) {
+                viewModel.loadListings()
+            }
+        } else if (currentState !is HomeUiState.Success) {
+            viewModel.showOfflineState()
+        }
+    }
 
     Scaffold(
         bottomBar = {

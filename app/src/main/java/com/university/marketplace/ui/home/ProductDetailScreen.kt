@@ -50,6 +50,7 @@ private val UserCoordinatesSaver = listSaver<Pair<Double, Double>?, Double>(
 @Composable
 fun ProductDetailScreen(
     productId: String,
+    isOnline: Boolean,
     onBack: () -> Unit,
     viewModel: ListingDetailViewModel
 ) {
@@ -60,10 +61,15 @@ fun ProductDetailScreen(
         mutableStateOf<Pair<Double, Double>?>(null)
     }
 
-    LaunchedEffect(productId) {
-        if (uiState is ListingDetailUiState.Loading) {
-            viewModel.loadListing(productId)
+    LaunchedEffect(productId, isOnline) {
+        val currentState = uiState
+        if (currentState is ListingDetailUiState.Success) return@LaunchedEffect
+        if (!isOnline) {
+            viewModel.showOfflineState()
+            return@LaunchedEffect
         }
+        viewModel.resetToLoading()
+        viewModel.loadListing(productId)
     }
 
     LaunchedEffect(Unit) {

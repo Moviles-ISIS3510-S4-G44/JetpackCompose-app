@@ -9,8 +9,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.launch
@@ -83,7 +86,11 @@ fun AppNavigation(factory: MarketplaceViewModelFactory) {
         }
     }
 
+    var lastNotifiedOnline by rememberSaveable { mutableStateOf<Boolean?>(null) }
     LaunchedEffect(isOnline) {
+        val previous = lastNotifiedOnline
+        lastNotifiedOnline = isOnline
+        if (previous == null || previous == isOnline) return@LaunchedEffect
         val message = if (isOnline) "Connection restored" else "No internet connection"
         Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
     }
@@ -212,6 +219,7 @@ fun AppNavigation(factory: MarketplaceViewModelFactory) {
                 val detailViewModel: ListingDetailViewModel = viewModel(factory = factory)
                 ProductDetailScreen(
                     productId = productId,
+                    isOnline = isOnline,
                     onBack = { navController.popBackStack() },
                     viewModel = detailViewModel
                 )

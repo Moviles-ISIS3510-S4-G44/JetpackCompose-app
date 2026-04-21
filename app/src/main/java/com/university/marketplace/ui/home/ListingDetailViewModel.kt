@@ -3,6 +3,7 @@ package com.university.marketplace.ui.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.university.marketplace.data.InteractionsRepository
+import com.university.marketplace.data.toUserFriendlyMessage
 import com.university.marketplace.domain.usecase.GetListingByIdUseCase
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -33,8 +34,22 @@ class ListingDetailViewModel(
                     interactionsRepository.registerVisit(listing.id)
                 }
             } catch (e: Exception) {
-                _uiState.value = ListingDetailUiState.Error(e.message ?: "Failed to load listing")
+                _uiState.value = ListingDetailUiState.Error(
+                    e.toUserFriendlyMessage(fallback = "Failed to load listing")
+                )
             }
         }
+    }
+
+    fun showOfflineState() {
+        if (_uiState.value is ListingDetailUiState.Success) return
+        _uiState.value = ListingDetailUiState.Error(
+            "You appear to be offline. Please check your connection and try again."
+        )
+    }
+
+    fun resetToLoading() {
+        if (_uiState.value is ListingDetailUiState.Success) return
+        _uiState.value = ListingDetailUiState.Loading
     }
 }
