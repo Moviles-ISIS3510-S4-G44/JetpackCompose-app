@@ -1,18 +1,11 @@
 package com.university.marketplace.data.auth
 
-import com.google.gson.GsonBuilder
 import com.google.gson.annotations.SerializedName
-import com.university.marketplace.BuildConfig
-import okhttp3.OkHttpClient
-import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Response
-import retrofit2.Retrofit
-import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.Body
 import retrofit2.http.Field
 import retrofit2.http.FormUrlEncoded
 import retrofit2.http.GET
-import retrofit2.http.Header
 import retrofit2.http.POST
 
 interface AuthApiService {
@@ -27,9 +20,13 @@ interface AuthApiService {
     ): Response<TokenResponseDto>
 
     @GET("users/me")
-    suspend fun getCurrentUser(
-        @Header("Authorization") authorization: String
-    ): Response<CurrentUserResponseDto>
+    suspend fun getCurrentUser(): Response<CurrentUserResponseDto>
+
+    @POST("auth/logout")
+    suspend fun logout(@Body payload: LogoutRequestDto): Response<Unit>
+
+    @POST("auth/refresh")
+    suspend fun refresh(@Body payload: RefreshTokenRequestDto): Response<TokenResponseDto>
 }
 
 data class SignupRequestDto(
@@ -65,33 +62,18 @@ data class CurrentUserResponseDto(
     val rating: Int
 )
 
+data class LogoutRequestDto(
+    @SerializedName("session_id")
+    val sessionId: String,
+    @SerializedName("refresh_token")
+    val refreshToken: String
+)
+
+data class RefreshTokenRequestDto(
+    @SerializedName("refresh_token")
+    val refreshToken: String
+)
+
 data class ApiErrorResponseDto(
     val detail: String?
 )
-
-object AuthApiFactory {
-    fun create(): AuthApiService {
-        val loggingInterceptor = HttpLoggingInterceptor().apply {
-            level = HttpLoggingInterceptor.Level.BASIC
-        }
-
-        val client = OkHttpClient.Builder()
-            .addInterceptor(loggingInterceptor)
-            .build()
-
-        return Retrofit.Builder()
-            .baseUrl(normalizeBaseUrl(BuildConfig.API_BASE_URL))
-            .client(client)
-            .addConverterFactory(
-                GsonConverterFactory.create(
-                    GsonBuilder().create()
-                )
-            )
-            .build()
-            .create(AuthApiService::class.java)
-    }
-
-    private fun normalizeBaseUrl(baseUrl: String): String {
-        return if (baseUrl.endsWith('/')) baseUrl else "$baseUrl/"
-    }
-}

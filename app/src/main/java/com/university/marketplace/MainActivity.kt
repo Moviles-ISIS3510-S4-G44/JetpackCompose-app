@@ -9,8 +9,10 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.launch
 import androidx.navigation.NavType
 import androidx.navigation.navArgument
 import androidx.navigation.compose.NavHost
@@ -54,6 +56,7 @@ fun AppNavigation(factory: MarketplaceViewModelFactory) {
     val connectivityMonitor = remember { AndroidConnectivityMonitor(context.applicationContext) }
     val isOnline by connectivityMonitor.isOnline.collectAsState(initial = connectivityMonitor.isCurrentlyOnline())
     val authRepository = remember { AuthRepositoryFactory.create(context.applicationContext) }
+    val coroutineScope = rememberCoroutineScope()
     val startDestination = if (authRepository.hasActiveSession()) "home" else "sign_in"
     val navigateToTopLevel: (String) -> Unit = { route ->
         navController.navigate(route) {
@@ -61,11 +64,20 @@ fun AppNavigation(factory: MarketplaceViewModelFactory) {
             launchSingleTop = true
         }
     }
-    val navigateToSignIn: () -> Unit = {
-        authRepository.clearSession()
+    val goToSignIn: () -> Unit = {
         navController.navigate("sign_in") {
             popUpTo(navController.graph.startDestinationId) { inclusive = true }
             launchSingleTop = true
+        }
+    }
+    val onUnauthorized: () -> Unit = {
+        authRepository.clearSession()
+        goToSignIn()
+    }
+    val onLogout: () -> Unit = {
+        coroutineScope.launch {
+            runCatching { authRepository.logout() }
+            goToSignIn()
         }
     }
 
@@ -117,7 +129,7 @@ fun AppNavigation(factory: MarketplaceViewModelFactory) {
                 try {
                     authRepository.getCurrentUser()
                 } catch (_: UnauthorizedAuthException) {
-                    navigateToSignIn()
+                    onUnauthorized()
                 }
             }
             HomeMarketplaceScreen(
@@ -152,8 +164,8 @@ fun AppNavigation(factory: MarketplaceViewModelFactory) {
                         Toast.makeText(context, "Cannot create listing while offline", Toast.LENGTH_SHORT).show()
                     }
                 },
-                onLogout = navigateToSignIn,
-                onUnauthorized = navigateToSignIn
+                onLogout = onLogout,
+                onUnauthorized = onUnauthorized
             )
         }
         composable(
