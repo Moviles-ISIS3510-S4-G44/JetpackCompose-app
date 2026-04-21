@@ -2,6 +2,7 @@ package com.university.marketplace.ui.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.university.marketplace.data.InteractionsRepository
 import com.university.marketplace.domain.usecase.GetListingByIdUseCase
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -15,7 +16,8 @@ sealed interface ListingDetailUiState {
 }
 
 class ListingDetailViewModel(
-    private val getListingByIdUseCase: GetListingByIdUseCase
+    private val getListingByIdUseCase: GetListingByIdUseCase,
+    private val interactionsRepository: InteractionsRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<ListingDetailUiState>(ListingDetailUiState.Loading)
@@ -27,6 +29,9 @@ class ListingDetailViewModel(
             try {
                 val listing = getListingByIdUseCase(id)
                 _uiState.value = ListingDetailUiState.Success(listing.toUiModel())
+                viewModelScope.launch {
+                    interactionsRepository.registerVisit(listing.id)
+                }
             } catch (e: Exception) {
                 _uiState.value = ListingDetailUiState.Error(e.message ?: "Failed to load listing")
             }

@@ -1,5 +1,7 @@
 package com.university.marketplace.di
 
+import com.university.marketplace.data.DefaultInteractionsRepository
+import com.university.marketplace.data.InteractionsRepository
 import com.university.marketplace.data.ListingsRepository
 import com.university.marketplace.data.api.NetworkModule
 import com.university.marketplace.domain.ListingRepository
@@ -9,6 +11,7 @@ import com.university.marketplace.domain.usecase.SearchListingsByRelevanceUseCas
 
 interface AppContainer {
     val listingRepository: ListingRepository
+    val interactionsRepository: InteractionsRepository
     val getActiveListingsUseCase: GetActiveListingsUseCase
     val getListingByIdUseCase: GetListingByIdUseCase
     val searchListingsByRelevanceUseCase: SearchListingsByRelevanceUseCase
@@ -17,6 +20,10 @@ interface AppContainer {
 class DefaultAppContainer : AppContainer {
     override val listingRepository: ListingRepository by lazy {
         ListingsRepository(api = NetworkModule.listingsApi)
+    }
+
+    override val interactionsRepository: InteractionsRepository by lazy {
+        DefaultInteractionsRepository(api = NetworkModule.interactionsApi)
     }
 
     override val getActiveListingsUseCase: GetActiveListingsUseCase by lazy {
@@ -31,4 +38,3 @@ class DefaultAppContainer : AppContainer {
         SearchListingsByRelevanceUseCase()
     }
 }
-

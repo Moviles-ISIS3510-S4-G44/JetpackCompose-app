@@ -22,6 +22,7 @@ object NetworkModule {
     private lateinit var authSessionStorageInternal: AuthSessionStorage
     private lateinit var authApiInternal: AuthApiService
     private lateinit var listingsApiInternal: ListingsApi
+    private lateinit var interactionsApiInternal: InteractionsApi
 
     val authSessionStorage: AuthSessionStorage
         get() = synchronized(this) { authSessionStorageInternal }
@@ -31,6 +32,9 @@ object NetworkModule {
 
     val listingsApi: ListingsApi
         get() = synchronized(this) { listingsApiInternal }
+
+    val interactionsApi: InteractionsApi
+        get() = synchronized(this) { interactionsApiInternal }
 
     fun initialize(context: Context) {
         if (initialized) return
@@ -90,6 +94,7 @@ object NetworkModule {
 
             authApiInternal = authenticatedRetrofit.create(AuthApiService::class.java)
             listingsApiInternal = authenticatedMoshiRetrofit.create(ListingsApi::class.java)
+            interactionsApiInternal = authenticatedRetrofit.create(InteractionsApi::class.java)
 
             initialized = true
         }
