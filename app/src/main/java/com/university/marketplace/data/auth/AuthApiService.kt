@@ -17,7 +17,7 @@ import retrofit2.http.POST
 
 interface AuthApiService {
     @POST("auth/signup")
-    suspend fun signup(@Body payload: SignupRequestDto): Response<CurrentUserResponseDto>
+    suspend fun signup(@Body payload: SignupRequestDto): Response<SignupResponseDto>
 
     @FormUrlEncoded
     @POST("auth/login")
@@ -26,7 +26,7 @@ interface AuthApiService {
         @Field("password") password: String
     ): Response<TokenResponseDto>
 
-    @GET("auth/me")
+    @GET("users/me")
     suspend fun getCurrentUser(
         @Header("Authorization") authorization: String
     ): Response<CurrentUserResponseDto>
@@ -38,11 +38,24 @@ data class SignupRequestDto(
     val password: String
 )
 
+data class SignupResponseDto(
+    @SerializedName("user_id")
+    val userId: String
+)
+
 data class TokenResponseDto(
+    @SerializedName("session_id")
+    val sessionId: String?,
     @SerializedName("access_token")
     val accessToken: String,
     @SerializedName("token_type")
-    val tokenType: String
+    val tokenType: String,
+    @SerializedName("expires_in")
+    val expiresIn: Long?,
+    @SerializedName("refresh_token")
+    val refreshToken: String?,
+    @SerializedName("refresh_expires_in")
+    val refreshExpiresIn: Long?
 )
 
 data class CurrentUserResponseDto(
