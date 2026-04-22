@@ -79,7 +79,7 @@ The app is integrated with these backend endpoints:
   - Form body: `username`, `password`
   - The app sends the email in the `username` field, matching FastAPI OAuth2 form expectations
 
-- `GET /auth/me`
+- `GET /users/me`
   - Used after login to fetch the authenticated user
 
 ## Typical development flows

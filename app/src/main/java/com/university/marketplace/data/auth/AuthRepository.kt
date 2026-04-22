@@ -1,7 +1,9 @@
 package com.university.marketplace.data.auth
 
 import android.content.Context
+import android.util.Log
 import com.google.gson.Gson
+import com.university.marketplace.data.api.NetworkModule
 import com.university.marketplace.domain.AuthenticatedUser
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -10,6 +12,8 @@ interface AuthRepository {
     suspend fun login(email: String, password: String, persistSession: Boolean): AuthenticatedUser
     suspend fun signup(name: String, email: String, password: String, persistSession: Boolean): AuthenticatedUser
     suspend fun getCurrentUser(): AuthenticatedUser
+    suspend fun logout()
+    suspend fun refreshAccessToken(): String
     fun hasActiveSession(): Boolean
     fun clearSession()
 }
@@ -33,17 +37,14 @@ class DefaultAuthRepository(
             )
         }
 
-        val token = loginResponse.body()?.accessToken
+        val body = loginResponse.body()
             ?: throw AuthException("The server did not return an access token.")
 
-        if (persistSession) {
-            sessionStorage.saveAccessToken(token)
-        } else {
-            sessionStorage.clear()
-        }
+        val session = body.toAuthSession()
+        sessionStorage.saveSession(session, rememberAcrossRestarts = persistSession)
 
         try {
-            getCurrentUser(token)
+            fetchCurrentUser()
         } catch (error: Throwable) {
             sessionStorage.clear()
             throw error
@@ -74,9 +75,70 @@ class DefaultAuthRepository(
     }
 
     override suspend fun getCurrentUser(): AuthenticatedUser = withContext(Dispatchers.IO) {
-        val token = sessionStorage.getAccessToken()
-            ?: throw AuthException("No active session was found.")
-        getCurrentUser(token)
+        if (sessionStorage.getAccessToken().isNullOrBlank()) {
+            throw UnauthorizedAuthException("No active session was found.")
+        }
+        try {
+            fetchCurrentUser()
+        } catch (unauthorized: UnauthorizedAuthException) {
+            sessionStorage.clear()
+            throw unauthorized
+        }
+    }
+
+    override suspend fun logout() = withContext(Dispatchers.IO) {
+        val session = sessionStorage.getSession()
+        if (session?.sessionId != null && !session.refreshToken.isNullOrBlank()) {
+            try {
+                val response = apiService.logout(
+                    LogoutRequestDto(
+                        sessionId = session.sessionId,
+                        refreshToken = session.refreshToken
+                    )
+                )
+                if (!response.isSuccessful) {
+                    Log.w(
+                        TAG,
+                        "Server logout failed with ${response.code()}; clearing local session anyway."
+                    )
+                }
+            } catch (error: Throwable) {
+                Log.w(TAG, "Server logout request failed; clearing local session anyway.", error)
+            }
+        }
+        sessionStorage.clear()
+    }
+
+    override suspend fun refreshAccessToken(): String = withContext(Dispatchers.IO) {
+        val refreshToken = sessionStorage.getSession()?.refreshToken
+        if (refreshToken.isNullOrBlank()) {
+            sessionStorage.clear()
+            throw UnauthorizedAuthException("Your session has expired. Please sign in again.")
+        }
+
+        val response = try {
+            apiService.refresh(RefreshTokenRequestDto(refreshToken = refreshToken))
+        } catch (error: Throwable) {
+            sessionStorage.clear()
+            throw error
+        }
+
+        if (!response.isSuccessful) {
+            val exception = buildAuthException(
+                statusCode = response.code(),
+                errorBody = response.errorBody()?.string(),
+                unauthorizedMessage = "Your session has expired. Please sign in again."
+            )
+            sessionStorage.clear()
+            throw exception
+        }
+
+        val body = response.body()
+            ?: throw AuthException("The server did not return a refreshed access token.")
+
+        val newSession = body.toAuthSession()
+        sessionStorage.updateTokens(newSession)
+        newSession.accessToken
     }
 
     override fun hasActiveSession(): Boolean = !sessionStorage.getAccessToken().isNullOrBlank()
@@ -85,21 +147,28 @@ class DefaultAuthRepository(
         sessionStorage.clear()
     }
 
-    private suspend fun getCurrentUser(token: String): AuthenticatedUser {
-        val currentUserResponse = apiService.getCurrentUser(authorization = "Bearer $token")
-        if (!currentUserResponse.isSuccessful) {
-            if (currentUserResponse.code() == 401) {
-                sessionStorage.clear()
-            }
+    private suspend fun fetchCurrentUser(): AuthenticatedUser {
+        val response = apiService.getCurrentUser()
+        if (!response.isSuccessful) {
             throw buildAuthException(
-                statusCode = currentUserResponse.code(),
-                errorBody = currentUserResponse.errorBody()?.string(),
+                statusCode = response.code(),
+                errorBody = response.errorBody()?.string(),
                 unauthorizedMessage = "Your session has expired. Please sign in again."
             )
         }
-
-        return currentUserResponse.body()?.toDomain()
+        return response.body()?.toDomain()
             ?: throw AuthException("The server did not return user information.")
+    }
+
+    private fun TokenResponseDto.toAuthSession(): AuthSession {
+        val now = System.currentTimeMillis()
+        return AuthSession(
+            sessionId = sessionId,
+            accessToken = accessToken,
+            accessExpiresAtEpochMillis = expiresIn?.let { now + it * 1000L },
+            refreshToken = refreshToken,
+            refreshExpiresAtEpochMillis = refreshExpiresIn?.let { now + it * 1000L }
+        )
     }
 
     private fun CurrentUserResponseDto.toDomain(): AuthenticatedUser {
@@ -137,6 +206,10 @@ class DefaultAuthRepository(
             AuthException(message)
         }
     }
+
+    private companion object {
+        const val TAG = "AuthRepository"
+    }
 }
 
 open class AuthException(message: String) : Exception(message)
@@ -145,9 +218,10 @@ class UnauthorizedAuthException(message: String) : AuthException(message)
 
 object AuthRepositoryFactory {
     fun create(context: Context): AuthRepository {
+        NetworkModule.initialize(context)
         return DefaultAuthRepository(
-            apiService = AuthApiFactory.create(),
-            sessionStorage = AuthSessionStorage(context)
+            apiService = NetworkModule.authApi,
+            sessionStorage = NetworkModule.authSessionStorage
         )
     }
 }
