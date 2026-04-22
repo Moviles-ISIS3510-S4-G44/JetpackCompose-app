@@ -6,6 +6,9 @@ sealed interface HomeUiState {
     data class Success(
         val featured: List<ListingUiModel>,
         val recent: List<ListingUiModel>,
-        val isSearching: Boolean = false
+        val isSearching: Boolean = false,
+        val selectedCategory: String = "Todo",
+        val selectedCondition: String = "Todos",
+        val selectedPriceCap: Int? = null
     ) : HomeUiState
 }

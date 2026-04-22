@@ -17,7 +17,8 @@ class MarketplaceViewModelFactory(
             modelClass.isAssignableFrom(HomeViewModel::class.java) -> {
                 HomeViewModel(
                     getActiveListingsUseCase = container.getActiveListingsUseCase,
-                    searchListingsByRelevanceUseCase = container.searchListingsByRelevanceUseCase
+                    searchListingsByRelevanceUseCase = container.searchListingsByRelevanceUseCase,
+                    locationRepository = container.locationRepository
                 ) as T
             }
             modelClass.isAssignableFrom(ListingDetailViewModel::class.java) -> {
@@ -33,4 +34,3 @@ class MarketplaceViewModelFactory(
         }
     }
 }
-

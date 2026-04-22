@@ -14,7 +14,7 @@ fun Listing.toUiModel(): ListingUiModel {
         longitude = longitude,
         condition = condition,
         sellerName = "Seller $sellerId",
-        locationName = "Campus"
+        locationName = "Campus",
+        distance = null
     )
 }
-

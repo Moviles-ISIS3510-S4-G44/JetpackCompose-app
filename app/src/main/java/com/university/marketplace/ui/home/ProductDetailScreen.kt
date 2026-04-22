@@ -2,6 +2,8 @@ package com.university.marketplace.ui.home
 
 import android.Manifest
 import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -49,6 +51,23 @@ fun ProductDetailScreen(
     val context = LocalContext.current
     val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
     var userCoordinates by remember { mutableStateOf<Pair<Double, Double>?>(null) }
+    val updateLocation: () -> Unit = {
+        fusedLocationClient.lastLocation
+            .addOnSuccessListener { location ->
+                if (location != null) {
+                    userCoordinates = location.latitude to location.longitude
+                }
+            }
+    }
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) {
+        val hasLocation = it[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
+            it[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+        if (hasLocation) {
+            updateLocation()
+        }
+    }
 
     LaunchedEffect(productId) {
         viewModel.loadListing(productId)
@@ -64,22 +83,24 @@ fun ProductDetailScreen(
         ) == PackageManager.PERMISSION_GRANTED
 
         if (hasFineLocation || hasCoarseLocation) {
-            fusedLocationClient.lastLocation
-                .addOnSuccessListener { location ->
-                    if (location != null) {
-                        userCoordinates = location.latitude to location.longitude
-                    }
-                }
+            updateLocation()
+        } else {
+            permissionLauncher.launch(
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                )
+            )
         }
     }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Product Details", fontSize = 18.sp, fontWeight = FontWeight.Bold) },
+                title = { Text("Detalle del producto", fontSize = 18.sp, fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
                     }
                 },
                 actions = {
@@ -111,7 +132,7 @@ fun ProductDetailScreen(
                         ) {
                             Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = null, tint = MarketplaceDark)
                             Spacer(Modifier.width(8.dp))
-                            Text("Contact Seller", color = MarketplaceDark, fontWeight = FontWeight.Bold)
+                            Text("Contactar vendedor", color = MarketplaceDark, fontWeight = FontWeight.Bold)
                         }
 
                         Surface(
@@ -147,10 +168,10 @@ fun ProductDetailScreen(
                                 listing.latitude,
                                 listing.longitude
                             )
-                            String.format(Locale.US, "%s • %.1f km away", listing.locationName, distanceKm)
-                        } ?: "${listing.locationName} • distance unavailable"
+                            String.format(Locale.US, "%s • a %.1f km", listing.locationName, distanceKm)
+                        } ?: "${listing.locationName} • distancia no disponible"
                     } else {
-                        "${listing.locationName} • location unavailable"
+                        "${listing.locationName} • ubicación no disponible"
                     }
                     Column(
                         modifier = Modifier
@@ -206,14 +227,14 @@ fun ProductDetailScreen(
                                 Box(modifier = Modifier.size(48.dp).clip(CircleShape).background(Color.LightGray))
                                 Column(modifier = Modifier.padding(start = 12.dp).weight(1f)) {
                                     Text(listing.sellerName, fontWeight = FontWeight.Bold)
-                                    Text("University Student", fontSize = 12.sp, color = Color.Gray)
+                                    Text("Estudiante universitario", fontSize = 12.sp, color = Color.Gray)
                                 }
-                                Text("View Profile", color = MarketplaceYellow, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                Text("Ver perfil", color = MarketplaceYellow, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                             }
 
                             Spacer(modifier = Modifier.height(24.dp))
 
-                            Text("Description", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                            Text("Descripción", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
                             Text(
                                 text = listing.description,
                                 modifier = Modifier.padding(top = 8.dp),

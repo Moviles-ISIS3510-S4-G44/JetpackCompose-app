@@ -23,6 +23,7 @@ object NetworkModule {
     private lateinit var authApiInternal: AuthApiService
     private lateinit var listingsApiInternal: ListingsApi
     private lateinit var interactionsApiInternal: InteractionsApi
+    private lateinit var groqApiInternal: GroqApi
 
     val authSessionStorage: AuthSessionStorage
         get() = synchronized(this) { authSessionStorageInternal }
@@ -35,6 +36,9 @@ object NetworkModule {
 
     val interactionsApi: InteractionsApi
         get() = synchronized(this) { interactionsApiInternal }
+
+    val groqApi: GroqApi
+        get() = synchronized(this) { groqApiInternal }
 
     fun initialize(context: Context) {
         if (initialized) return
@@ -92,9 +96,16 @@ object NetworkModule {
                 .addConverterFactory(MoshiConverterFactory.create(moshi))
                 .build()
 
+            val groqRetrofit = Retrofit.Builder()
+                .baseUrl("https://api.groq.com/openai/")
+                .client(baseClient)
+                .addConverterFactory(MoshiConverterFactory.create(moshi))
+                .build()
+
             authApiInternal = authenticatedRetrofit.create(AuthApiService::class.java)
             listingsApiInternal = authenticatedMoshiRetrofit.create(ListingsApi::class.java)
             interactionsApiInternal = authenticatedRetrofit.create(InteractionsApi::class.java)
+            groqApiInternal = groqRetrofit.create(GroqApi::class.java)
 
             initialized = true
         }
