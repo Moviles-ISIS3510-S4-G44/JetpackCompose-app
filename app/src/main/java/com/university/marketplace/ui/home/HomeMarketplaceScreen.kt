@@ -76,6 +76,7 @@ fun HomeMarketplaceScreen(
     onNavigateToProfile: () -> Unit,
     onNavigateToDetail: (String) -> Unit,
     onNavigateToSell: () -> Unit,
+    onNavigateToPurchases: () -> Unit = {},
     isOnline: Boolean,
     viewModel: HomeViewModel
 ) {
@@ -103,6 +104,7 @@ fun HomeMarketplaceScreen(
                     when (route) {
                         "profile" -> onNavigateToProfile()
                         "create_listing" -> onNavigateToSell()
+                        "purchase_history" -> onNavigateToPurchases()
                     }
                 }
             )
@@ -406,7 +408,7 @@ fun MarketplaceBottomNavigation(
     ) {
         val items = listOf(
             BottomNavItem("Home", Icons.Filled.Home, Icons.Outlined.Home, route = "home"),
-            BottomNavItem("Search", Icons.Filled.Search, Icons.Outlined.Search, route = "home"),
+            BottomNavItem("Purchases", Icons.Filled.Search, Icons.Outlined.Search, route = "purchase_history"),
             BottomNavItem("Sell", Icons.Filled.Add, Icons.Outlined.Add, route = "create_listing"),
             BottomNavItem("Messages", Icons.Filled.ChatBubble, Icons.Outlined.ChatBubbleOutline, route = "home"),
             BottomNavItem("Profile", Icons.Filled.Person, Icons.Outlined.PersonOutline, route = "profile")

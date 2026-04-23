@@ -90,7 +90,8 @@ fun ProfileRoute(
     onLogout: () -> Unit,
     onUnauthorized: () -> Unit,
     myListingsViewModel: MyListingsViewModel? = null,
-    onNavigateToDetail: ((String) -> Unit)? = null
+    onNavigateToDetail: ((String) -> Unit)? = null,
+    onNavigateToSales: (() -> Unit)? = null
 ) {
     var user by rememberSaveable(stateSaver = AuthenticatedUserSaver) {
         mutableStateOf<AuthenticatedUser?>(null)
@@ -142,7 +143,8 @@ fun ProfileRoute(
         onNavigateSell = onNavigateSell,
         onLogout = onLogout,
         myListingsUiState = myListingsUiState,
-        onNavigateToDetail = onNavigateToDetail
+        onNavigateToDetail = onNavigateToDetail,
+        onNavigateToSales = onNavigateToSales
     )
 }
 
@@ -156,7 +158,8 @@ private fun ProfileScreen(
     onNavigateSell: () -> Unit,
     onLogout: () -> Unit,
     myListingsUiState: MyListingsUiState = MyListingsUiState.Empty,
-    onNavigateToDetail: ((String) -> Unit)? = null
+    onNavigateToDetail: ((String) -> Unit)? = null,
+    onNavigateToSales: (() -> Unit)? = null
 ) {
     var showLogoutDialog by rememberSaveable { mutableStateOf(false) }
     val offlineBannerController = rememberOfflineBannerController(isOnline)
@@ -250,7 +253,8 @@ private fun ProfileScreen(
                             user = user,
                             onLogoutRequested = { showLogoutDialog = true },
                             myListingsUiState = myListingsUiState,
-                            onNavigateToDetail = onNavigateToDetail
+                            onNavigateToDetail = onNavigateToDetail,
+                            onNavigateToSales = onNavigateToSales
                         )
                     }
                 }
@@ -264,7 +268,8 @@ private fun ProfileContent(
     user: AuthenticatedUser,
     onLogoutRequested: () -> Unit,
     myListingsUiState: MyListingsUiState = MyListingsUiState.Empty,
-    onNavigateToDetail: ((String) -> Unit)? = null
+    onNavigateToDetail: ((String) -> Unit)? = null,
+    onNavigateToSales: (() -> Unit)? = null
 ) {
     val wide = isWideScreen()
     Box(
@@ -316,6 +321,20 @@ private fun ProfileContent(
                 uiState = myListingsUiState,
                 onNavigateToDetail = onNavigateToDetail
             )
+
+            if (onNavigateToSales != null) {
+                Button(
+                    onClick = onNavigateToSales,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MarketplaceYellow,
+                        contentColor = MarketplaceDark
+                    ),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Text("My Sales", fontWeight = FontWeight.Bold)
+                }
+            }
         }
     }
 }
