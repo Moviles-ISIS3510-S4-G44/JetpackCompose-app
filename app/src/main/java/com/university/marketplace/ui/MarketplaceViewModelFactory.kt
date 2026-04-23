@@ -17,7 +17,9 @@ class MarketplaceViewModelFactory(
             modelClass.isAssignableFrom(HomeViewModel::class.java) -> {
                 HomeViewModel(
                     getActiveListingsUseCase = container.getActiveListingsUseCase,
-                    searchListingsByRelevanceUseCase = container.searchListingsByRelevanceUseCase
+                    searchListingsByRelevanceUseCase = container.searchListingsByRelevanceUseCase,
+                    getFilteredListingsUseCase = container.getFilteredListingsUseCase,
+                    categoryRepository = container.categoryRepository
                 ) as T
             }
             modelClass.isAssignableFrom(ListingDetailViewModel::class.java) -> {

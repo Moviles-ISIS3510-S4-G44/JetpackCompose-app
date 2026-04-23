@@ -81,7 +81,8 @@ fun HomeMarketplaceScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
-    val categories = listOf("Books", "Electronics", "Furniture", "Study")
+    val categories by viewModel.categories.collectAsState()
+    val selectedCategoryId by viewModel.selectedCategoryId.collectAsState()
 
     LaunchedEffect(isOnline) {
         val currentState = uiState
@@ -166,12 +167,13 @@ fun HomeMarketplaceScreen(
                 // Categories
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(categories) { category ->
+                        val isSelected = selectedCategoryId == category.id
                         SuggestionChip(
-                            onClick = { },
-                            label = { Text(category) },
+                            onClick = { if (isOnline) viewModel.onCategorySelected(category.id) },
+                            label = { Text(category.name) },
                             shape = RoundedCornerShape(20.dp),
                             colors = SuggestionChipDefaults.suggestionChipColors(
-                                containerColor = MarketplaceWhite
+                                containerColor = if (isSelected) MarketplaceYellow else MarketplaceWhite
                             ),
                             border = null
                         )
