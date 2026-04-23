@@ -29,7 +29,8 @@ class MarketplaceViewModelFactory(
             modelClass.isAssignableFrom(ListingDetailViewModel::class.java) -> {
                 ListingDetailViewModel(
                     getListingByIdUseCase = container.getListingByIdUseCase,
-                    interactionsRepository = container.interactionsRepository
+                    interactionsRepository = container.interactionsRepository,
+                    createPurchaseUseCase = container.createPurchaseUseCase
                 ) as T
             }
             modelClass.isAssignableFrom(MapViewModel::class.java) -> {

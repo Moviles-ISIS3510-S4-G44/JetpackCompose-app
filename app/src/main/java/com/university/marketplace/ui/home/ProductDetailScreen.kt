@@ -19,6 +19,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.listSaver
@@ -55,10 +59,27 @@ fun ProductDetailScreen(
     viewModel: ListingDetailViewModel
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val purchaseState by viewModel.purchaseState.collectAsState()
     val context = LocalContext.current
     val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
     var userCoordinates by rememberSaveable(stateSaver = UserCoordinatesSaver) {
         mutableStateOf<Pair<Double, Double>?>(null)
+    }
+    var showPurchaseDialog by remember { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(purchaseState) {
+        when (val ps = purchaseState) {
+            is PurchaseUiState.Success -> {
+                snackbarHostState.showSnackbar("Purchase successful!")
+                viewModel.resetPurchaseState()
+            }
+            is PurchaseUiState.Error -> {
+                snackbarHostState.showSnackbar(ps.message)
+                viewModel.resetPurchaseState()
+            }
+            else -> {}
+        }
     }
 
     LaunchedEffect(productId, isOnline) {
@@ -94,7 +115,28 @@ fun ProductDetailScreen(
         }
     }
 
+    if (showPurchaseDialog) {
+        val listing = (uiState as? ListingDetailUiState.Success)?.listing
+        AlertDialog(
+            onDismissRequest = { showPurchaseDialog = false },
+            title = { Text("Confirm Purchase") },
+            text = {
+                Text("Buy \"${listing?.name ?: "this item"}\" for $${listing?.price?.toInt()}?")
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showPurchaseDialog = false
+                    listing?.let { viewModel.purchase(it.id) }
+                }) { Text("Buy") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showPurchaseDialog = false }) { Text("Cancel") }
+            }
+        )
+    }
+
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("Product Details", fontSize = 18.sp, fontWeight = FontWeight.Bold) },
@@ -124,15 +166,25 @@ fun ProductDetailScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
+                        val isPurchasing = purchaseState is PurchaseUiState.Loading
                         Button(
-                            onClick = { /* Contactar */ },
+                            onClick = { if (isOnline && !isPurchasing) showPurchaseDialog = true },
                             modifier = Modifier.weight(1f).height(56.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = MarketplaceYellow),
-                            shape = RoundedCornerShape(28.dp)
+                            shape = RoundedCornerShape(28.dp),
+                            enabled = isOnline && !isPurchasing
                         ) {
-                            Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = null, tint = MarketplaceDark)
-                            Spacer(Modifier.width(8.dp))
-                            Text("Contact Seller", color = MarketplaceDark, fontWeight = FontWeight.Bold)
+                            if (isPurchasing) {
+                                CircularProgressIndicator(
+                                    color = MarketplaceDark,
+                                    modifier = Modifier.size(20.dp),
+                                    strokeWidth = 2.dp
+                                )
+                            } else {
+                                Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = null, tint = MarketplaceDark)
+                                Spacer(Modifier.width(8.dp))
+                                Text("Buy Now", color = MarketplaceDark, fontWeight = FontWeight.Bold)
+                            }
                         }
 
                         Surface(
