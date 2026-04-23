@@ -1,6 +1,8 @@
 package com.university.marketplace.data.api
 
+import retrofit2.http.Body
 import retrofit2.http.GET
+import retrofit2.http.POST
 import retrofit2.http.Path
 import retrofit2.http.Query
 
@@ -21,4 +23,7 @@ interface ListingsApi {
 
     @GET("listings/me")
     suspend fun getMyListings(): List<ListingDto>
+
+    @POST("listings")
+    suspend fun createListing(@Body payload: CreateListingDto): ListingDto
 }
