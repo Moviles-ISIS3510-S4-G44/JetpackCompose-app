@@ -35,8 +35,9 @@ import com.university.marketplace.ui.auth.SignInScreen
 import com.university.marketplace.ui.auth.SignUpScreen
 import com.university.marketplace.ui.MarketplaceViewModelFactory
 import com.university.marketplace.ui.home.HomeMarketplaceScreen
-import com.university.marketplace.ui.home.HomeViewModel
 import com.university.marketplace.ui.home.CreateListingScreen
+import com.university.marketplace.ui.home.CreateListingViewModel
+import com.university.marketplace.ui.home.HomeViewModel
 import com.university.marketplace.ui.home.ListingDetailViewModel
 import com.university.marketplace.ui.home.ProductDetailScreen
 import com.university.marketplace.ui.profile.ProfileRoute
@@ -204,9 +205,11 @@ fun AppNavigation(container: com.university.marketplace.di.AppContainer) {
         }
         // Sell
         composable("create_listing") {
+            val createListingViewModel: CreateListingViewModel = viewModel(factory = factory)
             CreateListingScreen(
                 onBack = { navController.popBackStack() },
-                isOnline = isOnline
+                isOnline = isOnline,
+                viewModel = createListingViewModel
             )
         }
         // Detail Product
