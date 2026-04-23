@@ -98,31 +98,46 @@ private fun SaleCard(sale: Purchase) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "Sale #${sale.id.take(8)}",
-                    fontWeight = FontWeight.Bold,
-                    style = MaterialTheme.typography.bodyMedium
-                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Listing #${sale.listingId.take(8)}",
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Text(
+                        text = sale.purchasedAt.take(10),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.Gray
+                    )
+                }
                 Text(
                     text = "$${sale.priceAtPurchase}",
                     fontWeight = FontWeight.ExtraBold,
                     color = MarketplaceYellow
                 )
             }
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = sale.purchasedAt.take(10),
-                style = MaterialTheme.typography.bodySmall,
-                color = Color.Gray
-            )
             if (sale.sellerRating != null) {
                 Spacer(modifier = Modifier.height(8.dp))
+                Surface(
+                    color = Color(0xFFF5F5F5),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        text = "Rating received: ${"★".repeat(sale.sellerRating)}${"☆".repeat(5 - sale.sellerRating)}",
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MarketplaceDark
+                    )
+                }
+            } else {
+                Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "Buyer rated you: ${sale.sellerRating}/5",
+                    text = "Not yet rated by buyer",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MarketplaceDark.copy(alpha = 0.7f)
+                    color = Color.Gray
                 )
             }
         }
