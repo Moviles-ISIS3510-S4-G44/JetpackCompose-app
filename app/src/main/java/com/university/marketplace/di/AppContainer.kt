@@ -5,11 +5,13 @@ import com.university.marketplace.data.DefaultInteractionsRepository
 import com.university.marketplace.data.InteractionsRepository
 import com.university.marketplace.data.ListingsRepository
 import com.university.marketplace.data.api.NetworkModule
+import com.university.marketplace.data.auth.AuthRepository
 import com.university.marketplace.domain.CategoryRepository
 import com.university.marketplace.domain.ListingRepository
 import com.university.marketplace.domain.usecase.GetActiveListingsUseCase
 import com.university.marketplace.domain.usecase.GetFilteredListingsUseCase
 import com.university.marketplace.domain.usecase.GetListingByIdUseCase
+import com.university.marketplace.domain.usecase.GetMyListingsUseCase
 import com.university.marketplace.domain.usecase.SearchListingsByRelevanceUseCase
 
 interface AppContainer {
@@ -20,6 +22,7 @@ interface AppContainer {
     val getListingByIdUseCase: GetListingByIdUseCase
     val searchListingsByRelevanceUseCase: SearchListingsByRelevanceUseCase
     val getFilteredListingsUseCase: GetFilteredListingsUseCase
+    val getMyListingsUseCase: GetMyListingsUseCase
 }
 
 class DefaultAppContainer : AppContainer {
@@ -49,5 +52,9 @@ class DefaultAppContainer : AppContainer {
 
     override val getFilteredListingsUseCase: GetFilteredListingsUseCase by lazy {
         GetFilteredListingsUseCase(listingRepository)
+    }
+
+    override val getMyListingsUseCase: GetMyListingsUseCase by lazy {
+        GetMyListingsUseCase(listingRepository)
     }
 }

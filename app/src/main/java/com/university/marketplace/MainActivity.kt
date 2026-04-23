@@ -48,19 +48,20 @@ class MainActivity : ComponentActivity() {
         val container = (application as? MarketplaceApplication)?.container ?: DefaultAppContainer()
         setContent {
             JetpackComposeAppTheme {
-                AppNavigation(factory = MarketplaceViewModelFactory(container))
+                AppNavigation(container = container)
             }
         }
     }
 }
 
 @Composable
-fun AppNavigation(factory: MarketplaceViewModelFactory) {
+fun AppNavigation(container: com.university.marketplace.di.AppContainer) {
     val navController = rememberNavController()
     val context = LocalContext.current
     val connectivityMonitor = remember { AndroidConnectivityMonitor(context.applicationContext) }
     val isOnline by connectivityMonitor.isOnline.collectAsState(initial = connectivityMonitor.isCurrentlyOnline())
     val authRepository = remember { AuthRepositoryFactory.create(context.applicationContext) }
+    val factory = remember(container, authRepository) { MarketplaceViewModelFactory(container, authRepository) }
     val coroutineScope = rememberCoroutineScope()
     val startDestination = if (authRepository.hasActiveSession()) "home" else "sign_in"
     val navigateToTopLevel: (String) -> Unit = { route ->
