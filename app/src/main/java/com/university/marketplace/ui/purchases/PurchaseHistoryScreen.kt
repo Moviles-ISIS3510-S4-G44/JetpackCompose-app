@@ -11,6 +11,10 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -143,6 +147,7 @@ private fun PurchaseCard(
                     }
                 }
             } else {
+                var hoveredRating by remember { mutableIntStateOf(0) }
                 Text(
                     "Rate the seller:",
                     fontSize = 13.sp,
@@ -151,13 +156,19 @@ private fun PurchaseCard(
                 Spacer(modifier = Modifier.height(4.dp))
                 Row {
                     repeat(5) { i ->
+                        val starFilled = i < hoveredRating
                         IconButton(
-                            onClick = { if (isOnline) onRate(i + 1) },
+                            onClick = {
+                                if (isOnline) {
+                                    hoveredRating = i + 1
+                                    onRate(i + 1)
+                                }
+                            },
                             modifier = Modifier.size(32.dp),
                             enabled = isOnline
                         ) {
                             Icon(
-                                imageVector = Icons.Outlined.StarBorder,
+                                imageVector = if (starFilled) Icons.Filled.Star else Icons.Outlined.StarBorder,
                                 contentDescription = "${i + 1} stars",
                                 tint = MarketplaceYellow
                             )
