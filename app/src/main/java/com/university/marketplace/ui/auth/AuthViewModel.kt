@@ -3,10 +3,10 @@ package com.university.marketplace.ui.auth
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.university.marketplace.BuildConfig
 import com.university.marketplace.data.auth.AuthException
 import com.university.marketplace.data.auth.AuthRepository
 import com.university.marketplace.domain.AuthenticatedUser
+import com.university.marketplace.ui.common.toUserFriendlyMessage
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -90,17 +90,19 @@ class AuthViewModel(
     }
 
     private fun Throwable.toUserMessage(): String {
-        val fallback = "We could not connect to the server. Check the API base URL and try again."
         return when (this) {
-            is AuthException -> message ?: "We could not complete the request."
-            else -> {
-                if (BuildConfig.DEBUG) {
-                    val detail = message ?: "No additional detail."
-                    "$fallback\n${this::class.simpleName}: $detail\nBase URL: ${BuildConfig.API_BASE_URL}"
-                } else {
-                    fallback
-                }
-            }
+            is AuthException -> message.toFriendlyAuthMessage()
+            else -> toUserFriendlyMessage()
+        }
+    }
+
+    private fun String?.toFriendlyAuthMessage(): String {
+        val value = this.orEmpty().lowercase()
+        return when {
+            value.contains("invalid credentials") -> "Correo o contrasena incorrectos. Revisa tus datos e intenta de nuevo."
+            value.contains("already registered") -> "Este correo ya tiene una cuenta registrada."
+            value.contains("session has expired") -> "Tu sesion termino. Inicia sesion de nuevo para continuar."
+            else -> "No pudimos completar la solicitud. Intenta nuevamente."
         }
     }
 }

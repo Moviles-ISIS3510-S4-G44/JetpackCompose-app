@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -19,6 +20,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.SignalWifiOff
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -46,11 +48,15 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import coil.compose.AsyncImage
 import com.google.android.gms.location.LocationServices
+import com.google.android.gms.maps.CameraUpdateFactory
+import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
+import com.google.android.gms.maps.model.LatLngBounds
 import com.google.maps.android.compose.GoogleMap
 import com.google.maps.android.compose.MapUiSettings
 import com.google.maps.android.compose.Marker
@@ -128,13 +134,13 @@ fun MapViewScreen(
     val appBarTitle = if (uiState is MapUiState.Success) {
         (uiState as MapUiState.Success).listing.name
     } else {
-        "Ubicación"
+        "Listing Location"
     }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(appBarTitle, fontWeight = FontWeight.Bold) },
+                title = { Text(appBarTitle, fontWeight = FontWeight.SemiBold, fontSize = 18.sp) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
@@ -155,7 +161,6 @@ fun MapViewScreen(
             modifier = Modifier
                 .padding(padding)
                 .fillMaxSize()
-                .background(MarketplaceBackground)
         ) {
             OfflineBanner(
                 isOnline = isOnline,
@@ -197,25 +202,80 @@ fun MapViewScreen(
                         val cameraPositionState = rememberCameraPositionState {
                             position = CameraPosition.fromLatLngZoom(listingLocation ?: DEFAULT_MAP_CENTER, 15f)
                         }
+                        var isMapLoaded by remember(listing.id) { mutableStateOf(false) }
 
-                        GoogleMap(
-                            modifier = Modifier.fillMaxSize(),
-                            cameraPositionState = cameraPositionState,
-                            uiSettings = MapUiSettings(zoomControlsEnabled = false)
-                        ) {
-                            listingLocation?.let {
-                                Marker(
-                                    state = rememberMarkerState(position = it),
-                                    title = listing.name,
-                                    snippet = "$${listing.price.toInt()}"
-                                )
+                        LaunchedEffect(isOnline, isMapLoaded, listingLocation, userLocation) {
+                            if (!isOnline || !isMapLoaded || listingLocation == null) {
+                                return@LaunchedEffect
                             }
 
-                            userLocation?.let {
-                                Marker(
-                                    state = rememberMarkerState(position = it),
-                                    title = "Tú"
+                            userLocation?.let { currentUserLocation ->
+                                val bounds = LatLngBounds.Builder()
+                                    .include(listingLocation)
+                                    .include(currentUserLocation)
+                                    .build()
+                                cameraPositionState.animate(
+                                    update = CameraUpdateFactory.newLatLngBounds(bounds, 160),
+                                    durationMs = 750
                                 )
+                            }
+                        }
+
+                        if (isOnline) {
+                            GoogleMap(
+                                modifier = Modifier.fillMaxSize(),
+                                cameraPositionState = cameraPositionState,
+                                uiSettings = MapUiSettings(zoomControlsEnabled = false),
+                                onMapLoaded = { isMapLoaded = true }
+                            ) {
+                                listingLocation?.let {
+                                    Marker(
+                                        state = rememberMarkerState(position = it),
+                                        title = listing.name,
+                                        snippet = "$${listing.price.toInt()}"
+                                    )
+                                }
+
+                                userLocation?.let {
+                                    Marker(
+                                        state = rememberMarkerState(position = it),
+                                        title = "Tu ubicación",
+                                        icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE)
+                                    )
+                                }
+                            }
+                        } else {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(MarketplaceDark),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(horizontal = 24.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.SignalWifiOff,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(64.dp),
+                                        tint = MarketplaceWhite
+                                    )
+                                    Spacer(modifier = Modifier.height(16.dp))
+                                    Text(
+                                        text = "Sin conexion",
+                                        style = MaterialTheme.typography.headlineSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MarketplaceWhite
+                                    )
+                                    Text(
+                                        text = "El mapa no esta disponible sin internet.",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MarketplaceWhite.copy(alpha = 0.85f),
+                                        modifier = Modifier.padding(top = 4.dp)
+                                    )
+                                }
                             }
                         }
 

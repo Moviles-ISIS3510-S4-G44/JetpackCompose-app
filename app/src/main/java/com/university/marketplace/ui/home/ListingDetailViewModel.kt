@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.university.marketplace.data.InteractionsRepository
 import com.university.marketplace.domain.usecase.GetListingByIdUseCase
+import com.university.marketplace.ui.common.toUserFriendlyMessage
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -33,7 +34,7 @@ class ListingDetailViewModel(
                     interactionsRepository.registerVisit(listing.id)
                 }
             } catch (e: Exception) {
-                _uiState.value = ListingDetailUiState.Error(e.message ?: "Failed to load listing")
+                _uiState.value = ListingDetailUiState.Error(e.toUserFriendlyMessage())
             }
         }
     }

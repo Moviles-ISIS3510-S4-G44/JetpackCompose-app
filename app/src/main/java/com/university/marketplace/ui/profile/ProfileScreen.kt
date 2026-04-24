@@ -44,6 +44,7 @@ import com.university.marketplace.data.auth.UnauthorizedAuthException
 import com.university.marketplace.domain.AuthenticatedUser
 import com.university.marketplace.ui.common.OfflineBanner
 import com.university.marketplace.ui.common.rememberOfflineBannerController
+import com.university.marketplace.ui.common.toUserFriendlyMessage
 import com.university.marketplace.ui.home.MarketplaceBottomNavigation
 import com.university.marketplace.ui.theme.MarketplaceBackground
 import com.university.marketplace.ui.theme.MarketplaceDark
@@ -78,7 +79,9 @@ fun ProfileRoute(
         } catch (_: UnauthorizedAuthException) {
             onUnauthorized()
         } catch (error: AuthException) {
-            errorMessage = error.message ?: "We could not load your profile."
+            errorMessage = error.toUserFriendlyMessage()
+        } catch (error: Throwable) {
+            errorMessage = error.toUserFriendlyMessage()
         } finally {
             isLoading = false
         }
