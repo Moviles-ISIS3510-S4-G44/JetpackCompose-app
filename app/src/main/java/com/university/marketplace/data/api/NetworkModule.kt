@@ -8,6 +8,7 @@ import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import com.university.marketplace.BuildConfig
 import com.university.marketplace.data.auth.AuthApiService
 import com.university.marketplace.data.auth.AuthSessionStorage
+import com.university.marketplace.data.chat.ChatWebSocketClient
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
@@ -25,6 +26,9 @@ object NetworkModule {
     private lateinit var interactionsApiInternal: InteractionsApi
     private lateinit var categoriesApiInternal: CategoriesApi
     private lateinit var purchasesApiInternal: PurchasesApi
+    private lateinit var chatApiInternal: ChatApi
+    private lateinit var authenticatedClientInternal: OkHttpClient
+    private lateinit var wsBaseUrlInternal: String
 
     val authSessionStorage: AuthSessionStorage
         get() = synchronized(this) { authSessionStorageInternal }
@@ -43,6 +47,17 @@ object NetworkModule {
 
     val purchasesApi: PurchasesApi
         get() = synchronized(this) { purchasesApiInternal }
+
+    val chatApi: ChatApi
+        get() = synchronized(this) { chatApiInternal }
+
+    fun createChatWebSocketClient(): ChatWebSocketClient =
+        synchronized(this) {
+            ChatWebSocketClient(
+                okHttpClient = authenticatedClientInternal,
+                wsBaseUrl = wsBaseUrlInternal
+            )
+        }
 
     fun initialize(context: Context) {
         if (initialized) return
@@ -84,6 +99,8 @@ object NetworkModule {
                     )
                 )
                 .build()
+            authenticatedClientInternal = authenticatedClient
+            wsBaseUrlInternal = baseUrl.replace("https://", "wss://").replace("http://", "ws://")
 
             val authenticatedRetrofit = Retrofit.Builder()
                 .baseUrl(baseUrl)
@@ -105,6 +122,7 @@ object NetworkModule {
             interactionsApiInternal = authenticatedRetrofit.create(InteractionsApi::class.java)
             categoriesApiInternal = authenticatedMoshiRetrofit.create(CategoriesApi::class.java)
             purchasesApiInternal = authenticatedMoshiRetrofit.create(PurchasesApi::class.java)
+            chatApiInternal = authenticatedMoshiRetrofit.create(ChatApi::class.java)
 
             initialized = true
         }

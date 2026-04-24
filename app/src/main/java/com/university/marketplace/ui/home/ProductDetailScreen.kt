@@ -56,6 +56,7 @@ fun ProductDetailScreen(
     productId: String,
     isOnline: Boolean,
     onBack: () -> Unit,
+    onMessageSeller: (() -> Unit)? = null,
     viewModel: ListingDetailViewModel
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -187,14 +188,29 @@ fun ProductDetailScreen(
                             }
                         }
 
-                        Surface(
-                            modifier = Modifier.size(56.dp),
-                            shape = RoundedCornerShape(16.dp),
-                            color = MarketplaceWhite,
-                            border = androidx.compose.foundation.BorderStroke(1.dp, Color.LightGray)
-                        ) {
-                            IconButton(onClick = { /* Guardar */ }) {
-                                Icon(Icons.Default.BookmarkBorder, contentDescription = null)
+                        if (onMessageSeller != null) {
+                            Button(
+                                onClick = { if (isOnline) onMessageSeller() },
+                                modifier = Modifier.weight(1f).height(56.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = MarketplaceWhite),
+                                shape = RoundedCornerShape(28.dp),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, MarketplaceYellow),
+                                enabled = isOnline
+                            ) {
+                                Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = null, tint = MarketplaceDark)
+                                Spacer(Modifier.width(8.dp))
+                                Text("Message", color = MarketplaceDark, fontWeight = FontWeight.Bold)
+                            }
+                        } else {
+                            Surface(
+                                modifier = Modifier.size(56.dp),
+                                shape = RoundedCornerShape(16.dp),
+                                color = MarketplaceWhite,
+                                border = androidx.compose.foundation.BorderStroke(1.dp, Color.LightGray)
+                            ) {
+                                IconButton(onClick = { /* Guardar */ }) {
+                                    Icon(Icons.Default.BookmarkBorder, contentDescription = null)
+                                }
                             }
                         }
                     }

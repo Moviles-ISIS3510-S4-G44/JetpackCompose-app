@@ -1,6 +1,7 @@
 package com.university.marketplace.di
 
 import com.university.marketplace.data.CategoriesRepository
+import com.university.marketplace.data.ChatRepositoryImpl
 import com.university.marketplace.data.DefaultInteractionsRepository
 import com.university.marketplace.data.InteractionsRepository
 import com.university.marketplace.data.ListingsRepository
@@ -8,6 +9,7 @@ import com.university.marketplace.data.PurchasesRepository
 import com.university.marketplace.data.api.NetworkModule
 import com.university.marketplace.data.auth.AuthRepository
 import com.university.marketplace.domain.CategoryRepository
+import com.university.marketplace.domain.ChatRepository
 import com.university.marketplace.domain.ListingRepository
 import com.university.marketplace.domain.PurchaseRepository
 import com.university.marketplace.domain.usecase.CreatePurchaseUseCase
@@ -25,6 +27,7 @@ interface AppContainer {
     val categoryRepository: CategoryRepository
     val purchaseRepository: PurchaseRepository
     val interactionsRepository: InteractionsRepository
+    val chatRepository: ChatRepository
     val getActiveListingsUseCase: GetActiveListingsUseCase
     val getListingByIdUseCase: GetListingByIdUseCase
     val searchListingsByRelevanceUseCase: SearchListingsByRelevanceUseCase
@@ -87,5 +90,9 @@ class DefaultAppContainer : AppContainer {
 
     override val rateSellerUseCase: RateSellerUseCase by lazy {
         RateSellerUseCase(purchaseRepository)
+    }
+
+    override val chatRepository: ChatRepository by lazy {
+        ChatRepositoryImpl(api = NetworkModule.chatApi)
     }
 }

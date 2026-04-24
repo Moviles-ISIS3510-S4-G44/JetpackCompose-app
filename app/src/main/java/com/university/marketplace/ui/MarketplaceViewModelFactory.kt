@@ -9,6 +9,7 @@ import com.university.marketplace.ui.home.CreateListingViewModel
 import com.university.marketplace.ui.home.HomeViewModel
 import com.university.marketplace.ui.home.ListingDetailViewModel
 import com.university.marketplace.ui.profile.MyListingsViewModel
+import com.university.marketplace.ui.chat.ConversationListViewModel
 import com.university.marketplace.ui.purchases.PurchaseHistoryViewModel
 import com.university.marketplace.ui.purchases.SalesHistoryViewModel
 
@@ -60,6 +61,9 @@ class MarketplaceViewModelFactory(
                 SalesHistoryViewModel(
                     getSalesHistoryUseCase = container.getSalesHistoryUseCase
                 ) as T
+            }
+            modelClass.isAssignableFrom(ConversationListViewModel::class.java) -> {
+                ConversationListViewModel(chatRepository = container.chatRepository) as T
             }
             else -> throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
         }
