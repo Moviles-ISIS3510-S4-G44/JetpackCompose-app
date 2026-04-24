@@ -2,6 +2,8 @@ package com.university.marketplace.map
 
 import android.Manifest
 import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -81,6 +83,22 @@ fun MapViewScreen(
     val context = LocalContext.current
     val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
     var userLocation by remember { mutableStateOf<LatLng?>(null) }
+    val updateUserLocation: () -> Unit = {
+        fusedLocationClient.lastLocation.addOnSuccessListener { location ->
+            if (location != null) {
+                userLocation = LatLng(location.latitude, location.longitude)
+            }
+        }
+    }
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) {
+        val hasLocation = it[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
+            it[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+        if (hasLocation) {
+            updateUserLocation()
+        }
+    }
 
     LaunchedEffect(productId) {
         viewModel.loadListing(productId)
@@ -96,18 +114,21 @@ fun MapViewScreen(
         ) == PackageManager.PERMISSION_GRANTED
 
         if (hasFineLocation || hasCoarseLocation) {
-            fusedLocationClient.lastLocation.addOnSuccessListener { location ->
-                if (location != null) {
-                    userLocation = LatLng(location.latitude, location.longitude)
-                }
-            }
+            updateUserLocation()
+        } else {
+            permissionLauncher.launch(
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                )
+            )
         }
     }
 
     val appBarTitle = if (uiState is MapUiState.Success) {
         (uiState as MapUiState.Success).listing.name
     } else {
-        "Location"
+        "Ubicación"
     }
 
     Scaffold(
@@ -118,7 +139,7 @@ fun MapViewScreen(
                     IconButton(onClick = onBack) {
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back",
+                            contentDescription = "Volver",
                             tint = MarketplaceDark
                         )
                     }
@@ -169,9 +190,9 @@ fun MapViewScreen(
                                     it.latitude,
                                     it.longitude
                                 )
-                                String.format(Locale.US, "Approx. %.1f km from you", distanceKm)
+                                String.format(Locale.US, "Aprox. %.1f km de ti", distanceKm)
                             }
-                        } ?: "Location unavailable"
+                        } ?: "Ubicación no disponible"
 
                         val cameraPositionState = rememberCameraPositionState {
                             position = CameraPosition.fromLatLngZoom(listingLocation ?: DEFAULT_MAP_CENTER, 15f)
@@ -193,7 +214,7 @@ fun MapViewScreen(
                             userLocation?.let {
                                 Marker(
                                     state = rememberMarkerState(position = it),
-                                    title = "You"
+                                    title = "Tú"
                                 )
                             }
                         }

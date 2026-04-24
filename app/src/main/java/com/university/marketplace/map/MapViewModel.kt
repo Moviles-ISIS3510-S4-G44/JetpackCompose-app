@@ -24,7 +24,7 @@ class MapViewModel(
                 val listing = getListingByIdUseCase(id)
                 _uiState.value = MapUiState.Success(listing.toUiModel())
             } catch (e: Exception) {
-                _uiState.value = MapUiState.Error(e.message ?: "Failed to load listing")
+                _uiState.value = MapUiState.Error(e.message ?: "No se pudo cargar la publicación")
             }
         }
     }

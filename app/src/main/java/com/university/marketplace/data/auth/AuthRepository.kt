@@ -2,11 +2,11 @@ package com.university.marketplace.data.auth
 
 import android.content.Context
 import android.util.Log
-import com.google.gson.Gson
 import com.university.marketplace.data.api.NetworkModule
 import com.university.marketplace.domain.AuthenticatedUser
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.json.JSONObject
 
 interface AuthRepository {
     suspend fun login(email: String, password: String, persistSession: Boolean): AuthenticatedUser
@@ -20,8 +20,7 @@ interface AuthRepository {
 
 class DefaultAuthRepository(
     private val apiService: AuthApiService,
-    private val sessionStorage: AuthSessionStorage,
-    private val gson: Gson = Gson()
+    private val sessionStorage: AuthSessionStorage
 ) : AuthRepository {
     override suspend fun login(
         email: String,
@@ -185,11 +184,11 @@ class DefaultAuthRepository(
         errorBody: String?,
         unauthorizedMessage: String = "We could not complete the request. Please try again."
     ): AuthException {
-        val apiMessage = runCatching {
-            gson.fromJson(errorBody, ApiErrorResponseDto::class.java)?.detail
-        }.getOrNull()
+        val apiMessage: String? = errorBody?.let { body ->
+            runCatching { JSONObject(body).optString("detail").takeIf { it.isNotBlank() } }.getOrNull()
+        }
 
-        val message =
+        val message: String =
             if (!apiMessage.isNullOrBlank()) {
                 apiMessage
             } else {

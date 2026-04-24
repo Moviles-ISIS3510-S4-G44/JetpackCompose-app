@@ -22,19 +22,22 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
 import coil.compose.AsyncImage
-import com.university.marketplace.ui.theme.* // Importa tus colores personalizados
+import com.university.marketplace.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CreateListingScreen(
     onBack: () -> Unit,
-    isOnline: Boolean
+    isOnline: Boolean,
+    onCreateListing: (title: String, price: Double, description: String, condition: String) -> Unit = { _, _, _, _ -> }
 ) {
+    val context = LocalContext.current
     var title by remember { mutableStateOf("") }
     var price by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
-    var selectedCondition by remember { mutableStateOf("New") }
+    var selectedCondition by remember { mutableStateOf("Nuevo") }
     var imageUri by remember { mutableStateOf<Uri?>(null) }
 
     val galleryLauncher = rememberLauncherForActivityResult(
@@ -44,10 +47,10 @@ fun CreateListingScreen(
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text("Create New Listing", fontWeight = FontWeight.Bold, fontSize = 18.sp) },
+                title = { Text("Crear publicación", fontWeight = FontWeight.Bold, fontSize = 18.sp) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.Close, contentDescription = "Close")
+                        Icon(Icons.Default.Close, contentDescription = "Cerrar")
                     }
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = MarketplaceWhite)
@@ -57,16 +60,41 @@ fun CreateListingScreen(
             Box(modifier = Modifier.padding(16.dp).navigationBarsPadding()) {
                 Button(
                     onClick = {
-                        println("ANALYTICS: create_listing | Title: $title")
+                        val parsedPrice = price.trim().replace(",", ".").toDoubleOrNull()
+                        val normalizedTitle = title.trim()
+                        val normalizedDescription = description.trim()
+                        if (normalizedTitle.isBlank() || normalizedDescription.isBlank() || parsedPrice == null || parsedPrice <= 0.0) {
+                            android.widget.Toast.makeText(
+                                context,
+                                "Completa título, precio y descripción válidos.",
+                                android.widget.Toast.LENGTH_SHORT
+                            ).show()
+                            return@Button
+                        }
+                        onCreateListing(
+                            normalizedTitle,
+                            parsedPrice,
+                            normalizedDescription,
+                            selectedCondition.lowercase()
+                        )
+                        // Mock success for offline mode
+                        if (!isOnline) {
+                            android.widget.Toast.makeText(context, "Publicación guardada localmente", android.widget.Toast.LENGTH_SHORT).show()
+                            onBack()
+                        }
                     },
                     modifier = Modifier.fillMaxWidth().height(56.dp),
                     shape = RoundedCornerShape(28.dp),
-                    enabled = isOnline,
-                    colors = ButtonDefaults.buttonColors(containerColor = MarketplaceYellow)
+                    // ALLOW CREATING OFFLINE (Eventual connectivity)
+                    enabled = true,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MarketplaceYellow,
+                        contentColor = MarketplaceDark
+                    )
                 ) {
-                    Icon(Icons.Default.Send, contentDescription = null, tint = MarketplaceDark)
+                    Icon(Icons.Default.Send, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
-                    Text("Post Listing", color = MarketplaceDark, fontWeight = FontWeight.Bold)
+                    Text("Crear", fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -79,7 +107,7 @@ fun CreateListingScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp)
         ) {
-            Text("Photos", fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 8.dp))
+            Text("Fotos", fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 8.dp))
 
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Box(
@@ -101,7 +129,7 @@ fun CreateListingScreen(
                     } else {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Icon(Icons.Default.AddAPhoto, contentDescription = null, tint = Color.Gray)
-                            Text("ADD PHOTO", fontSize = 10.sp, color = Color.Gray)
+                            Text("AGREGAR FOTO", fontSize = 10.sp, color = Color.Gray)
                         }
                     }
                 }
@@ -109,15 +137,13 @@ fun CreateListingScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Inputs
-            MarketplaceTextField(value = title, onValueChange = { title = it }, label = "Title (e.g. Organic Chemistry)")
+            MarketplaceTextField(value = title, onValueChange = { title = it }, label = "Título (ej. Química Orgánica)")
             Spacer(modifier = Modifier.height(12.dp))
-            MarketplaceTextField(value = price, onValueChange = { price = it }, label = "$ Price")
+            MarketplaceTextField(value = price, onValueChange = { price = it }, label = "$ Precio")
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Selector
-            Text("Condition", fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 8.dp))
+            Text("Condición", fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 8.dp))
             ConditionToggleGroup(
                 selectedCondition = selectedCondition,
                 onConditionSelected = { selectedCondition = it }
@@ -125,22 +151,27 @@ fun CreateListingScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Description
             MarketplaceTextField(
                 value = description,
                 onValueChange = { description = it },
-                label = "Item Description",
+                label = "Descripción del producto",
                 singleLine = false,
                 modifier = Modifier.height(120.dp)
             )
 
             if (!isOnline) {
                 Spacer(modifier = Modifier.height(16.dp))
-                Text(
-                    text = "You are offline. Publishing is disabled until the connection is restored.",
-                    color = Color.Red,
-                    style = MaterialTheme.typography.bodySmall
-                )
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF3E0)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = "Estás sin conexión. Tu publicación se sincronizará automáticamente cuando recuperes internet.",
+                        modifier = Modifier.padding(12.dp),
+                        color = Color(0xFFE65100),
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
             }
         }
     }
@@ -171,7 +202,7 @@ fun MarketplaceTextField(
 
 @Composable
 fun ConditionToggleGroup(selectedCondition: String, onConditionSelected: (String) -> Unit) {
-    val options = listOf("New", "Like New", "Used")
+    val options = listOf("Nuevo", "Como nuevo", "Usado")
     Row(
         modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Color(0xFFF1F1F1))
     ) {

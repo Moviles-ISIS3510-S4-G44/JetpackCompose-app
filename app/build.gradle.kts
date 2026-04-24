@@ -5,6 +5,7 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
+    id("com.google.devtools.ksp")
 }
 
 val secretsProperties = Properties()
@@ -15,10 +16,7 @@ if (secretsFile.exists()) {
     }
 }
 
-val apiBaseUrl =
-    secretsProperties.getProperty("API_BASE_URL")
-        ?: (project.findProperty("API_BASE_URL") as String?)
-        ?: "http://172.17.0.1:8000/"
+val apiBaseUrl = "https://uniandesmarketplacebackend.onrender.com/"
 
 android {
     namespace = "com.university.marketplace"
@@ -42,6 +40,7 @@ android {
                 ?: "YOUR_MAPS_API_KEY"
 
         buildConfigField("String", "API_BASE_URL", "\"$apiBaseUrl\"")
+        buildConfigField("String", "GROQ_API_KEY", "\"${secretsProperties.getProperty("GROQ_API_KEY") ?: ""}\"")
     }
 
     buildTypes {
@@ -68,6 +67,10 @@ android {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
+    }
+
+    androidResources {
+        noCompress += "tflite"
     }
 }
 
@@ -102,13 +105,23 @@ dependencies {
     // Image Loading
     implementation("io.coil-kt:coil-compose:2.7.0")
 
-    implementation("com.squareup.retrofit2:retrofit:2.11.0")
-    implementation("com.squareup.retrofit2:converter-gson:2.11.0")
     // Networking
     implementation("com.squareup.retrofit2:retrofit:2.11.0")
+    implementation("com.squareup.retrofit2:converter-gson:2.11.0")
     implementation("com.squareup.retrofit2:converter-moshi:2.11.0")
+    implementation("com.google.code.gson:gson:2.11.0")
     implementation("com.squareup.moshi:moshi-kotlin:1.15.1")
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
+
+    // Room
+    val roomVersion = "2.6.1"
+    implementation("androidx.room:room-runtime:$roomVersion")
+    implementation("androidx.room:room-ktx:$roomVersion")
+    ksp("androidx.room:room-compiler:$roomVersion")
+
+    // TFLite
+    implementation("org.tensorflow:tensorflow-lite:2.16.1")
+    implementation("org.tensorflow:tensorflow-lite-support:0.4.4")
 
     implementation("com.google.maps.android:maps-compose:6.1.0")
     implementation("com.google.android.gms:play-services-maps:19.0.0")
