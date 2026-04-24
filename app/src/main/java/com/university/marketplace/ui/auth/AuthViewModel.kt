@@ -3,10 +3,9 @@ package com.university.marketplace.ui.auth
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.university.marketplace.BuildConfig
-import com.university.marketplace.data.auth.AuthException
 import com.university.marketplace.data.auth.AuthRepository
 import com.university.marketplace.domain.AuthenticatedUser
+import com.university.marketplace.ui.common.UserMessageMapper
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -82,23 +81,11 @@ class AuthViewModel(
                     currentState.copy(
                         isLoading = false,
                         authenticatedUser = null,
-                        errorMessage = throwable.toUserMessage()
+                        errorMessage = UserMessageMapper.fromError(
+                            throwable = throwable,
+                            fallback = "No fue posible conectarse al servidor. Intenta nuevamente."
+                        )
                     )
-                }
-            }
-        }
-    }
-
-    private fun Throwable.toUserMessage(): String {
-        val fallback = "We could not connect to the server. Check the API base URL and try again."
-        return when (this) {
-            is AuthException -> message ?: "We could not complete the request."
-            else -> {
-                if (BuildConfig.DEBUG) {
-                    val detail = message ?: "No additional detail."
-                    "$fallback\n${this::class.simpleName}: $detail\nBase URL: ${BuildConfig.API_BASE_URL}"
-                } else {
-                    fallback
                 }
             }
         }

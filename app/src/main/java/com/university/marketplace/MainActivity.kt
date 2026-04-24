@@ -1,18 +1,25 @@
 package com.university.marketplace
 
 import android.os.Bundle
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.launch
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.ui.Modifier
 import androidx.navigation.NavType
 import androidx.navigation.navArgument
 import androidx.navigation.compose.NavHost
@@ -57,6 +64,8 @@ fun AppNavigation(factory: MarketplaceViewModelFactory) {
     val isOnline by connectivityMonitor.isOnline.collectAsState(initial = connectivityMonitor.isCurrentlyOnline())
     val authRepository = remember { AuthRepositoryFactory.create(context.applicationContext) }
     val coroutineScope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
+    var hasProcessedConnectivityState by rememberSaveable { mutableStateOf(false) }
     val startDestination = if (authRepository.hasActiveSession()) "home" else "sign_in"
     val navigateToTopLevel: (String) -> Unit = { route ->
         navController.navigate(route) {
@@ -82,11 +91,25 @@ fun AppNavigation(factory: MarketplaceViewModelFactory) {
     }
 
     LaunchedEffect(isOnline) {
-        val message = if (isOnline) "Connection restored" else "No internet connection"
-        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+        if (hasProcessedConnectivityState) {
+            val message = if (isOnline) {
+                "Conexion restablecida"
+            } else {
+                "Sin conexion a internet"
+            }
+            snackbarHostState.showSnackbar(message)
+        }
+        hasProcessedConnectivityState = true
     }
 
-    NavHost(navController = navController, startDestination = startDestination) {
+    Scaffold(
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
+    ) { innerPadding ->
+        NavHost(
+            navController = navController,
+            startDestination = startDestination,
+            modifier = Modifier.padding(innerPadding)
+        ) {
         composable("sign_in") {
             val authViewModel = viewModel<AuthViewModel>(
                 factory = AuthViewModelFactory(authRepository)
@@ -125,11 +148,15 @@ fun AppNavigation(factory: MarketplaceViewModelFactory) {
         }
         composable("home") {
             val homeViewModel: HomeViewModel = viewModel(factory = factory)
-            LaunchedEffect(Unit) {
-                try {
-                    authRepository.getCurrentUser()
-                } catch (_: UnauthorizedAuthException) {
-                    onUnauthorized()
+            LaunchedEffect(isOnline) {
+                if (isOnline) {
+                    try {
+                        authRepository.getCurrentUser()
+                    } catch (_: UnauthorizedAuthException) {
+                        onUnauthorized()
+                    } catch (_: Throwable) {
+                        snackbarHostState.showSnackbar("No fue posible validar tu sesion en este momento")
+                    }
                 }
             }
             HomeMarketplaceScreen(
@@ -144,7 +171,9 @@ fun AppNavigation(factory: MarketplaceViewModelFactory) {
                     if (isOnline) {
                         navController.navigate("create_listing")
                     } else {
-                        Toast.makeText(context, "Cannot create listing while offline", Toast.LENGTH_SHORT).show()
+                        coroutineScope.launch {
+                            snackbarHostState.showSnackbar("No puedes crear publicaciones sin conexion")
+                        }
                     }
                 },
                 isOnline = isOnline
@@ -161,7 +190,9 @@ fun AppNavigation(factory: MarketplaceViewModelFactory) {
                     if (isOnline) {
                         navController.navigate("create_listing")
                     } else {
-                        Toast.makeText(context, "Cannot create listing while offline", Toast.LENGTH_SHORT).show()
+                        coroutineScope.launch {
+                            snackbarHostState.showSnackbar("No puedes crear publicaciones sin conexion")
+                        }
                     }
                 },
                 onLogout = onLogout,
@@ -210,5 +241,6 @@ fun AppNavigation(factory: MarketplaceViewModelFactory) {
                 )
             }
         }
+    }
     }
 }

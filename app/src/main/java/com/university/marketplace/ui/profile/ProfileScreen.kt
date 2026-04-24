@@ -79,6 +79,8 @@ fun ProfileRoute(
             onUnauthorized()
         } catch (error: AuthException) {
             errorMessage = error.message ?: "We could not load your profile."
+        } catch (_: Throwable) {
+            errorMessage = "No fue posible cargar el perfil en este momento."
         } finally {
             isLoading = false
         }

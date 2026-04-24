@@ -3,6 +3,7 @@ package com.university.marketplace.map
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.university.marketplace.domain.usecase.GetListingByIdUseCase
+import com.university.marketplace.ui.common.UserMessageMapper
 import com.university.marketplace.ui.home.toUiModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -24,7 +25,12 @@ class MapViewModel(
                 val listing = getListingByIdUseCase(id)
                 _uiState.value = MapUiState.Success(listing.toUiModel())
             } catch (e: Exception) {
-                _uiState.value = MapUiState.Error(e.message ?: "Failed to load listing")
+                _uiState.value = MapUiState.Error(
+                    UserMessageMapper.fromError(
+                        throwable = e,
+                        fallback = "No pudimos cargar la ubicacion de esta publicacion."
+                    )
+                )
             }
         }
     }

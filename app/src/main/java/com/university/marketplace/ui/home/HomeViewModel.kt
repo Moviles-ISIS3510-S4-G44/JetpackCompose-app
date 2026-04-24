@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.university.marketplace.domain.Listing
 import com.university.marketplace.domain.usecase.GetActiveListingsUseCase
 import com.university.marketplace.domain.usecase.SearchListingsByRelevanceUseCase
+import com.university.marketplace.ui.common.UserMessageMapper
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -34,7 +35,12 @@ class HomeViewModel(
                 allListings = getActiveListingsUseCase()
                 updateSections(allListings.map { it.toUiModel() })
             } catch (e: Exception) {
-                _uiState.value = HomeUiState.Error(e.message ?: "An unknown error occurred")
+                _uiState.value = HomeUiState.Error(
+                    UserMessageMapper.fromError(
+                        throwable = e,
+                        fallback = "No pudimos cargar los anuncios. Intenta nuevamente."
+                    )
+                )
             }
         }
     }
