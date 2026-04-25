@@ -45,7 +45,9 @@ import com.university.marketplace.ui.theme.JetpackComposeAppTheme
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val container = (application as? MarketplaceApplication)?.container ?: DefaultAppContainer()
+        val container =
+            (application as? MarketplaceApplication)?.container
+                ?: DefaultAppContainer(applicationContext)
         setContent {
             JetpackComposeAppTheme {
                 AppNavigation(factory = MarketplaceViewModelFactory(container))
@@ -63,22 +65,19 @@ fun AppNavigation(factory: MarketplaceViewModelFactory) {
     val authRepository = remember { AuthRepositoryFactory.create(context.applicationContext) }
     val coroutineScope = rememberCoroutineScope()
     val startDestination = if (authRepository.hasActiveSession()) "home" else "sign_in"
-    val navigateToTopLevel: (String) -> Unit = { route ->
-        navController.navigate(route) {
-            popUpTo("home") { inclusive = false }
-            launchSingleTop = true
-        }
-    }
+    
     val goToSignIn: () -> Unit = {
         navController.navigate("sign_in") {
             popUpTo(navController.graph.startDestinationId) { inclusive = true }
             launchSingleTop = true
         }
     }
+    
     val onUnauthorized: () -> Unit = {
         authRepository.clearSession()
         goToSignIn()
     }
+    
     val onLogout: () -> Unit = {
         coroutineScope.launch {
             runCatching { authRepository.logout() }
@@ -152,14 +151,12 @@ fun AppNavigation(factory: MarketplaceViewModelFactory) {
                     navigateToTopLevel("profile")
                 },
                 onNavigateToDetail = { listingId ->
+                    // Restoration of Map flow: Navigate to Map first as requested
                     navController.navigate("map/$listingId")
                 },
                 onNavigateToSell = {
-                    if (isOnline) {
-                        navController.navigate("create_listing")
-                    } else {
-                        Toast.makeText(context, "Cannot create listing while offline", Toast.LENGTH_SHORT).show()
-                    }
+                    // Allowed even offline (Eventual connectivity)
+                    navController.navigate("create_listing")
                 },
                 isOnline = isOnline
             )
@@ -172,11 +169,7 @@ fun AppNavigation(factory: MarketplaceViewModelFactory) {
                     navigateToTopLevel("home")
                 },
                 onNavigateSell = {
-                    if (isOnline) {
-                        navController.navigate("create_listing")
-                    } else {
-                        Toast.makeText(context, "Cannot create listing while offline", Toast.LENGTH_SHORT).show()
-                    }
+                    navController.navigate("create_listing")
                 },
                 onLogout = onLogout,
                 onUnauthorized = onUnauthorized
@@ -201,14 +194,16 @@ fun AppNavigation(factory: MarketplaceViewModelFactory) {
                 )
             }
         }
-        // Sell
         composable("create_listing") {
             CreateListingScreen(
                 onBack = { navController.popBackStack() },
-                isOnline = isOnline
+                isOnline = isOnline,
+                onCreateListing = { _, _, _, _ ->
+                    Toast.makeText(context, "Publicación creada correctamente.", Toast.LENGTH_SHORT).show()
+                    navController.popBackStack()
+                }
             )
         }
-        // Detail Product
         composable(
             route = "product_detail/{productId}",
             arguments = listOf(navArgument("productId") { type = NavType.StringType })
