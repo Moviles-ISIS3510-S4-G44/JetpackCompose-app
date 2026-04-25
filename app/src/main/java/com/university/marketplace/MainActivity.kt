@@ -42,6 +42,12 @@ import com.university.marketplace.ui.home.ListingDetailViewModel
 import com.university.marketplace.ui.home.ProductDetailScreen
 import com.university.marketplace.ui.profile.MyListingsViewModel
 import com.university.marketplace.ui.profile.ProfileRoute
+import com.university.marketplace.data.api.NetworkModule
+import com.university.marketplace.ui.chat.ChatScreen
+import com.university.marketplace.ui.chat.ChatViewModelFactory
+import com.university.marketplace.ui.chat.ChatViewModel
+import com.university.marketplace.ui.chat.ConversationListScreen
+import com.university.marketplace.ui.chat.ConversationListViewModel
 import com.university.marketplace.ui.purchases.PurchaseHistoryScreen
 import com.university.marketplace.ui.purchases.PurchaseHistoryViewModel
 import com.university.marketplace.ui.purchases.SalesHistoryScreen
@@ -168,6 +174,9 @@ fun AppNavigation(container: com.university.marketplace.di.AppContainer) {
                 onNavigateToPurchases = {
                     navController.navigate("purchase_history")
                 },
+                onNavigateToMessages = {
+                    navController.navigate("conversations")
+                },
                 isOnline = isOnline
             )
         }
@@ -228,6 +237,20 @@ fun AppNavigation(container: com.university.marketplace.di.AppContainer) {
                     productId = productId,
                     isOnline = isOnline,
                     onBack = { navController.popBackStack() },
+                    onMessageSeller = if (isOnline) {
+                        {
+                            coroutineScope.launch {
+                                try {
+                                    val conv = container.chatRepository.getOrCreateConversation(productId)
+                                    navController.navigate(
+                                        "chat/${conv.id}?name=${android.net.Uri.encode(conv.otherUserName)}"
+                                    )
+                                } catch (_: Exception) {
+                                    Toast.makeText(context, "Could not start conversation", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        }
+                    } else null,
                     viewModel = detailViewModel
                 )
             }
@@ -246,6 +269,49 @@ fun AppNavigation(container: com.university.marketplace.di.AppContainer) {
                 isOnline = isOnline,
                 onBack = { navController.popBackStack() },
                 viewModel = salesHistoryViewModel
+            )
+        }
+        composable("conversations") {
+            val conversationListViewModel: ConversationListViewModel = viewModel(factory = factory)
+            ConversationListScreen(
+                isOnline = isOnline,
+                onBack = { navController.popBackStack() },
+                onNavigateToChat = { conversationId, otherUserName ->
+                    navController.navigate(
+                        "chat/$conversationId?name=${android.net.Uri.encode(otherUserName)}"
+                    )
+                },
+                viewModel = conversationListViewModel
+            )
+        }
+        composable(
+            route = "chat/{conversationId}?name={otherUserName}",
+            arguments = listOf(
+                navArgument("conversationId") { type = NavType.StringType },
+                navArgument("otherUserName") {
+                    type = NavType.StringType
+                    defaultValue = "Chat"
+                }
+            )
+        ) { backStackEntry ->
+            val conversationId = backStackEntry.arguments?.getString("conversationId") ?: return@composable
+            val otherUserName = backStackEntry.arguments?.getString("otherUserName") ?: "Chat"
+            val token = remember { NetworkModule.authSessionStorage.getAccessToken().orEmpty() }
+            val currentUserId = remember { NetworkModule.authSessionStorage.getCurrentUserId().orEmpty() }
+            val chatVmFactory = remember(conversationId) {
+                ChatViewModelFactory(
+                    chatRepository = container.chatRepository,
+                    wsClient = NetworkModule.createChatWebSocketClient(),
+                    conversationId = conversationId,
+                    token = token,
+                    currentUserId = currentUserId
+                )
+            }
+            val chatViewModel: ChatViewModel = viewModel(factory = chatVmFactory)
+            ChatScreen(
+                otherUserName = otherUserName,
+                onBack = { navController.popBackStack() },
+                viewModel = chatViewModel
             )
         }
     }

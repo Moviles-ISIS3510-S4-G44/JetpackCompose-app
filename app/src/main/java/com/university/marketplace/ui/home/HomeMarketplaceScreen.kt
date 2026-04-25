@@ -83,6 +83,7 @@ fun HomeMarketplaceScreen(
     onNavigateToDetail: (String) -> Unit,
     onNavigateToSell: () -> Unit,
     onNavigateToPurchases: () -> Unit = {},
+    onNavigateToMessages: () -> Unit = {},
     isOnline: Boolean,
     viewModel: HomeViewModel
 ) {
@@ -112,6 +113,7 @@ fun HomeMarketplaceScreen(
                         "profile" -> onNavigateToProfile()
                         "create_listing" -> onNavigateToSell()
                         "purchase_history" -> onNavigateToPurchases()
+                        "conversations" -> onNavigateToMessages()
                     }
                 )
             }
@@ -516,7 +518,7 @@ fun MarketplaceBottomNavigation(
             BottomNavItem("Home", Icons.Filled.Home, Icons.Outlined.Home, route = "home"),
             BottomNavItem("Purchases", Icons.Filled.Search, Icons.Outlined.Search, route = "purchase_history"),
             BottomNavItem("Sell", Icons.Filled.Add, Icons.Outlined.Add, route = "create_listing"),
-            BottomNavItem("Messages", Icons.Filled.ChatBubble, Icons.Outlined.ChatBubbleOutline, route = "home"),
+            BottomNavItem("Messages", Icons.Filled.ChatBubble, Icons.Outlined.ChatBubbleOutline, route = "conversations"),
             BottomNavItem("Profile", Icons.Filled.Person, Icons.Outlined.PersonOutline, route = "profile")
         )
 

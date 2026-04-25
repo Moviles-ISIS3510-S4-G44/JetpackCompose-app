@@ -56,6 +56,21 @@ class AuthSessionStorage(context: Context) {
 
     fun getAccessToken(): String? = preferences.getString(KEY_ACCESS_TOKEN, null)
 
+    fun getCurrentUserId(): String? {
+        val token = getAccessToken() ?: return null
+        return try {
+            val payload = token.split(".").getOrNull(1) ?: return null
+            val decoded = android.util.Base64.decode(
+                payload,
+                android.util.Base64.URL_SAFE or android.util.Base64.NO_PADDING
+            )
+            val json = String(decoded)
+            """"sub"\s*:\s*"([^"]+)"""".toRegex().find(json)?.groupValues?.getOrNull(1)
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     fun clear() {
         preferences.edit()
             .remove(KEY_ACCESS_TOKEN)
