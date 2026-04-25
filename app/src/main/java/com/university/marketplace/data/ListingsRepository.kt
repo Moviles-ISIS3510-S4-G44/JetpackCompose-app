@@ -37,24 +37,31 @@ class ListingsRepository(
     private val semanticSearchEngine: SemanticSearchEngine
 ) : ListingRepository {
 
-    private val moshi = Moshi.Builder()
-        .add(KotlinJsonAdapterFactory())
-        .build()
-
-    private val listAdapter = moshi.adapter<List<String>>(
-        Types.newParameterizedType(List::class.java, String::class.java)
-    )
+    private val moshi = Moshi.Builder().add(KotlinJsonAdapterFactory()).build()
+    private val listType = Types.newParameterizedType(List::class.java, String::class.java)
+    private val listAdapter = moshi.adapter<List<String>>(listType)
 
     override fun getActiveListings(): Flow<List<Listing>> {
-        return flow {
-            emit(api.getListings(status = "published").map { it.toDomain() })
-        }.flowOn(Dispatchers.IO)
+        return dao.getActiveListings().map { entities ->
+            entities.map { it.toDomain() }
+        }
     }
 
     override suspend fun refreshListings() {
         withContext(Dispatchers.IO) {
-            val listings = api.getListings(status = "published")
-            dao.insertListings(listings.map { it.toDomain().toEntity() })
+            try {
+                val remoteListings = api.getListings(status = "published")
+                val entities = remoteListings.map { dto ->
+                    val domain = dto.toDomain()
+                    val embedding = semanticSearchEngine.getEmbedding("${domain.title} ${domain.description}")
+                    domain.toEntity(embedding)
+                }
+                dao.insertListings(entities)
+                dao.deleteStaleListings(System.currentTimeMillis() - 10 * 60 * 1000)
+                dao.deleteStaleSearchCache(System.currentTimeMillis() - 10 * 60 * 1000)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
     }
 
@@ -62,43 +69,8 @@ class ListingsRepository(
         return dao.getListingById(id)?.toDomain() ?: api.getListingById(id).toDomain()
     }
 
-    suspend fun parseSearchIntent(query: String): SearchIntent? {
-        return withContext(Dispatchers.IO) {
-            try {
-                val prompt = """
-                    Extract search filters from the following query in JSON format. Use these fields:
-                    - product_name (string)
-                    - max_price (number)
-                    - category (string)
-                    - condition (string: "new" or "used")
-                    - proximity_preference (number in km)
-                    - sort_order (string: "relevance", "price_low", "price_high")
-                    
-                    Return ONLY the JSON object.
-                    Query: "$query"
-                """.trimIndent()
-
-                val response = groqApi.completeChat(
-                    apiKey = "Bearer ${BuildConfig.GROQ_API_KEY}",
-                    request = GroqRequest(
-                        messages = listOf(GroqMessage(role = "user", content = prompt))
-                    )
-                )
-                
-                val content = response.choices.firstOrNull()?.message?.content ?: return@withContext null
-                // Clean markdown if present
-                val json = if (content.contains("```json")) {
-                    content.substringAfter("```json").substringBefore("```").trim()
-                } else {
-                    content.trim()
-                }
-                
-                moshi.adapter(SearchIntent::class.java).fromJson(json)
-            } catch (e: Exception) {
-                e.printStackTrace()
-                null
-            }
-        }
+    override suspend fun searchListings(query: String): Flow<List<Listing>> {
+        TODO("Not yet implemented")
     }
 
     override fun searchListingsFlow(query: String): Flow<List<Listing>> = flow {
@@ -110,7 +82,6 @@ class ListingsRepository(
             return@flow
         }
 
-        // 1. Check Query Cache
         val cachedSearch = dao.getSearchCache(normalizedQuery)
         if (cachedSearch != null && (System.currentTimeMillis() - cachedSearch.timestamp) < 10 * 60 * 1000) {
             val resultIds = listAdapter.fromJson(cachedSearch.resultIdsJson) ?: emptyList()
@@ -120,22 +91,23 @@ class ListingsRepository(
             }
         }
 
-        // 2. Immediate emit from local listings if no query cache or to provide baseline
         val cachedEntities = dao.getActiveListingsList()
-        if (cachedSearch == null) emit(cachedEntities.map { it.toDomain() })
+        if (cachedSearch == null) {
+            emit(cachedEntities.map { it.toDomain() })
+        }
 
         val vocabulary = buildVocabulary(cachedEntities.map { it.toDomain() })
         val correctedTokens = initialQueryTokens.map { token -> autocorrectToken(token, vocabulary) }
         val expandedQueryTokens = SearchQueryExpander.expandTokens(correctedTokens)
         val semanticQuery = expandedQueryTokens.joinToString(" ")
 
-        // 3. Parallel execution of Intent Parsing and Semantic Search
         coroutineScope {
             val intentDeferred = async { parseSearchIntent(query) }
             val queryEmbeddingDeferred = async { semanticSearchEngine.getEmbedding(semanticQuery) }
 
             val intent = intentDeferred.await()
             val queryEmbedding = queryEmbeddingDeferred.await()
+            val maxPriceFromIntent = intent?.max_price ?: extractMaxPriceFromQuery(query)
 
             val rankedListings = cachedEntities.map { entity ->
                 val listing = entity.toDomain()
@@ -145,8 +117,8 @@ class ListingsRepository(
                     0f
                 }
                 val lexicalScore = textSimilarityScore(listing, expandedQueryTokens)
-                val phraseBoost = if (SearchTextNormalizer.normalize("${listing.title} ${listing.description}")
-                    .contains(normalizedQuery)
+                val phraseBoost = if (
+                    SearchTextNormalizer.normalize("${listing.title} ${listing.description}").contains(normalizedQuery)
                 ) {
                     0.2f
                 } else {
@@ -156,13 +128,11 @@ class ListingsRepository(
                 listing to finalScore
             }.filter { (listing, finalScore) ->
                 var matches = finalScore >= 0.16f
-                
-                // Overlay Groq Intent Filters
                 intent?.let {
-                    if (it.max_price != null && listing.price > it.max_price) matches = false
-                    if (it.category != null && !listing.categoryId.contains(it.category, ignoreCase = true)) matches = false
+                    if (it.category != null && !matchesIntentCategory(listing, it.category)) matches = false
                     if (it.condition != null && !listing.condition.equals(it.condition, ignoreCase = true)) matches = false
                 }
+                if (maxPriceFromIntent != null && listing.price > maxPriceFromIntent) matches = false
                 matches
             }.sortedByDescending { pair ->
                 when (intent?.sort_order) {
@@ -172,7 +142,6 @@ class ListingsRepository(
                 }
             }.map { it.first }
 
-            // 4. Update Cache
             val resultIdsJson = listAdapter.toJson(rankedListings.map { it.id })
             val intentJson = moshi.adapter(SearchIntent::class.java).toJson(intent)
             dao.insertSearchCache(SearchCacheEntity(normalizedQuery, resultIdsJson, intentJson))
@@ -181,65 +150,7 @@ class ListingsRepository(
         }
     }.flowOn(Dispatchers.IO)
 
-    private fun textSimilarityScore(listing: Listing, expandedQueryTokens: List<String>): Float {
-        if (expandedQueryTokens.isEmpty()) return 0f
-        val listingText = SearchTextNormalizer.normalize(
-            "${listing.title} ${listing.description} ${listing.condition} ${listing.categoryId}"
-        )
-        val matched = expandedQueryTokens.count { token -> listingText.contains(token) }
-        return matched.toFloat() / expandedQueryTokens.size.toFloat()
-    }
-
-    private fun buildVocabulary(listings: List<Listing>): Set<String> {
-        return listings
-            .flatMap { listing ->
-                SearchTextNormalizer.tokenize(
-                    "${listing.title} ${listing.description} ${listing.condition} ${listing.categoryId}"
-                )
-            }
-            .filter { it.length >= 3 }
-            .toSet()
-    }
-
-    private fun autocorrectToken(token: String, vocabulary: Set<String>): String {
-        if (token.length < 4 || vocabulary.contains(token)) return token
-        var bestCandidate = token
-        var bestDistance = Int.MAX_VALUE
-        vocabulary.forEach { candidate ->
-            if (kotlin.math.abs(candidate.length - token.length) > 2) return@forEach
-            val distance = levenshteinDistance(token, candidate)
-            if (distance < bestDistance) {
-                bestDistance = distance
-                bestCandidate = candidate
-            }
-        }
-        return if (bestDistance <= 2) bestCandidate else token
-    }
-
-    private fun levenshteinDistance(a: String, b: String): Int {
-        if (a == b) return 0
-        if (a.isEmpty()) return b.length
-        if (b.isEmpty()) return a.length
-
-        val costs = IntArray(b.length + 1) { it }
-        for (i in 1..a.length) {
-            var previous = i - 1
-            costs[0] = i
-            for (j in 1..b.length) {
-                val current = costs[j]
-                val substitutionCost = if (a[i - 1] == b[j - 1]) 0 else 1
-                costs[j] = minOf(
-                    costs[j] + 1,
-                    costs[j - 1] + 1,
-                    previous + substitutionCost
-                )
-                previous = current
-            }
-        }
-        return costs[b.length]
-    }
-
-    override suspend fun searchListings(
+    override suspend fun searchListingsFiltered(
         q: String?,
         categoryId: String?,
         condition: String?,
@@ -282,5 +193,133 @@ class ListingsRepository(
                 location = location
             )
         ).toDomain()
+    }
+
+    private suspend fun parseSearchIntent(query: String): SearchIntent? {
+        return withContext(Dispatchers.IO) {
+            try {
+                val prompt = """
+                    Extract search filters from the following query in JSON format. Use these fields:
+                    - product_name (string)
+                    - max_price (number)
+                    - category (string)
+                    - condition (string: "new" or "used")
+                    - proximity_preference (number in km)
+                    - sort_order (string: "relevance", "price_low", "price_high")
+
+                    Return ONLY the JSON object.
+                    Query: "$query"
+                """.trimIndent()
+
+                val response = groqApi.completeChat(
+                    apiKey = "Bearer ${BuildConfig.GROQ_API_KEY}",
+                    request = GroqRequest(messages = listOf(GroqMessage(role = "user", content = prompt)))
+                )
+
+                val content = response.choices.firstOrNull()?.message?.content ?: return@withContext null
+                val json = content.substringAfter("```json").substringBefore("```").trim()
+                val finalJson = if (json.startsWith("{")) json else content
+                moshi.adapter(SearchIntent::class.java).fromJson(finalJson)
+            } catch (e: Exception) {
+                e.printStackTrace()
+                null
+            }
+        }
+    }
+
+    private fun textSimilarityScore(listing: Listing, expandedQueryTokens: List<String>): Float {
+        if (expandedQueryTokens.isEmpty()) return 0f
+        val listingText = SearchTextNormalizer.normalize(
+            "${listing.title} ${listing.description} ${listing.condition} ${listing.categoryId}"
+        )
+        val matched = expandedQueryTokens.count { token -> listingText.contains(token) }
+        return matched.toFloat() / expandedQueryTokens.size.toFloat()
+    }
+
+    private fun buildVocabulary(listings: List<Listing>): Set<String> {
+        return listings
+            .flatMap { listing ->
+                SearchTextNormalizer.tokenize(
+                    "${listing.title} ${listing.description} ${listing.condition} ${listing.categoryId}"
+                )
+            }
+            .filter { it.length >= 3 }
+            .toSet()
+    }
+
+    private fun autocorrectToken(token: String, vocabulary: Set<String>): String {
+        if (token.length < 4 || vocabulary.contains(token)) return token
+        var bestCandidate = token
+        var bestDistance = Int.MAX_VALUE
+        vocabulary.forEach { candidate ->
+            if (kotlin.math.abs(candidate.length - token.length) > 2) return@forEach
+            val distance = levenshteinDistance(token, candidate)
+            if (distance < bestDistance) {
+                bestDistance = distance
+                bestCandidate = candidate
+            }
+        }
+        return if (bestDistance <= 2) bestCandidate else token
+    }
+
+    private fun matchesIntentCategory(listing: Listing, categoryIntent: String): Boolean {
+        val normalizedIntent = SearchTextNormalizer.normalize(categoryIntent)
+        if (normalizedIntent.isBlank()) return true
+
+        val intentTokens = SearchQueryExpander.expandTokens(
+            SearchTextNormalizer.tokenize(normalizedIntent)
+        )
+
+        val listingText = SearchTextNormalizer.normalize(
+            "${listing.categoryId} ${listing.title} ${listing.description}"
+        )
+
+        val semanticCategoryGroups = mapOf(
+            "electronica" to setOf("electronica", "electronic", "laptop", "pc", "monitor", "teclado", "mouse", "camara", "celular", "smartphone", "tablet"),
+            "libros" to setOf("libro", "book", "novela", "texto", "manual", "kindle"),
+            "muebles" to setOf("mueble", "escritorio", "mesa", "silla", "sofa", "lampara"),
+            "accesorios" to setOf("accesorio", "mochila", "cable", "usb", "audifono", "auricular", "airpods")
+        )
+
+        val categoryGroupMatch = semanticCategoryGroups.any { (group, keywords) ->
+            val intentMatchesGroup = intentTokens.any { it == group || keywords.contains(it) }
+            intentMatchesGroup && keywords.any { keyword -> listingText.contains(keyword) }
+        }
+
+        return categoryGroupMatch || intentTokens.any { token -> listingText.contains(token) }
+    }
+
+    private fun extractMaxPriceFromQuery(query: String): Double? {
+        val normalized = SearchTextNormalizer.normalize(query)
+        val regex = "(\\d+[\\d\\.]*)\\s*(k|mil|m|millon|millones)?".toRegex()
+        val match = regex.find(normalized) ?: return null
+        val numberRaw = match.groupValues[1].replace(".", "")
+        val base = numberRaw.toDoubleOrNull() ?: return null
+        val multiplier = when (match.groupValues.getOrNull(2).orEmpty()) {
+            "k", "mil" -> 1_000.0
+            "m", "millon", "millones" -> 1_000_000.0
+            else -> 1.0
+        }
+        val value = base * multiplier
+        return if (value > 0.0) value else null
+    }
+
+    private fun levenshteinDistance(a: String, b: String): Int {
+        if (a == b) return 0
+        if (a.isEmpty()) return b.length
+        if (b.isEmpty()) return a.length
+
+        val costs = IntArray(b.length + 1) { it }
+        for (i in 1..a.length) {
+            var previous = i - 1
+            costs[0] = i
+            for (j in 1..b.length) {
+                val current = costs[j]
+                val substitutionCost = if (a[i - 1] == b[j - 1]) 0 else 1
+                costs[j] = minOf(costs[j] + 1, costs[j - 1] + 1, previous + substitutionCost)
+                previous = current
+            }
+        }
+        return costs[b.length]
     }
 }

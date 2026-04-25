@@ -2,7 +2,6 @@ package com.university.marketplace
 
 import android.os.Bundle
 import android.util.Log
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.Composable
@@ -15,7 +14,20 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Text
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import androidx.navigation.NavType
 import androidx.navigation.navArgument
@@ -109,15 +121,27 @@ fun AppNavigation(container: com.university.marketplace.di.AppContainer) {
     }
 
     var lastNotifiedOnline by rememberSaveable { mutableStateOf<Boolean?>(null) }
+    var uiMessage by rememberSaveable { mutableStateOf<String?>(null) }
     LaunchedEffect(isOnline) {
         val previous = lastNotifiedOnline
         lastNotifiedOnline = isOnline
         if (previous == null || previous == isOnline) return@LaunchedEffect
-        val message = if (isOnline) "Connection restored" else "No internet connection"
-        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+        uiMessage = if (isOnline) {
+            "Conexion restablecida"
+        } else {
+            "Sin conexion. Algunas acciones requeriran internet."
+        }
     }
 
-    NavHost(navController = navController, startDestination = startDestination) {
+    LaunchedEffect(uiMessage) {
+        if (uiMessage != null) {
+            delay(2800)
+            uiMessage = null
+        }
+    }
+
+    Box {
+        NavHost(navController = navController, startDestination = startDestination) {
         composable("sign_in") {
             val authViewModel = viewModel<AuthViewModel>(
                 factory = AuthViewModelFactory(authRepository, container.locationRepository)
@@ -256,7 +280,7 @@ fun AppNavigation(container: com.university.marketplace.di.AppContainer) {
                                         "chat/${conv.id}?name=${android.net.Uri.encode(conv.otherUserName)}"
                                     )
                                 } catch (_: Exception) {
-                                    Toast.makeText(context, "Could not start conversation", Toast.LENGTH_SHORT).show()
+                                    uiMessage = "No fue posible abrir el chat en este momento"
                                 }
                             }
                         }
@@ -316,6 +340,31 @@ fun AppNavigation(container: com.university.marketplace.di.AppContainer) {
                 onBack = { navController.popBackStack() },
                 viewModel = chatViewModel
             )
+        }
+        }
+
+        AnimatedVisibility(
+            visible = uiMessage != null,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = androidx.compose.ui.Modifier
+                .fillMaxSize()
+                .padding(top = 12.dp, start = 12.dp, end = 12.dp)
+        ) {
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = Color(0xFF0F766E)
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+            ) {
+                Text(
+                    text = uiMessage.orEmpty(),
+                    color = Color.White,
+                    modifier = androidx.compose.ui.Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 14.dp, vertical = 10.dp)
+                )
+            }
         }
     }
 }

@@ -1,250 +1,340 @@
 package com.university.marketplace.ui.home
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.foundation.Image
+import android.Manifest
+import android.content.Context
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.outlined.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ChatBubble
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.ChatBubbleOutline
+import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.PersonOutline
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import coil.compose.AsyncImage
-import com.university.marketplace.R
 import com.university.marketplace.domain.Category
-import com.university.marketplace.domain.Listing
-import com.university.marketplace.ui.theme.*
+import com.university.marketplace.ui.common.OfflineBanner
+import com.university.marketplace.ui.common.rememberOfflineBannerController
+import com.university.marketplace.ui.theme.MarketplaceDark
+import com.university.marketplace.ui.theme.MarketplaceWhite
+import com.university.marketplace.ui.theme.MarketplaceYellow
+import java.util.Locale
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeMarketplaceScreen(
-    viewModel: HomeViewModel,
     onNavigateToProfile: () -> Unit,
     onNavigateToDetail: (String) -> Unit,
     onNavigateToSell: () -> Unit,
-    onNavigateToPurchases: () -> Unit,
-    onNavigateToMessages: () -> Unit,
-    isOnline: Boolean
+    onNavigateToPurchases: () -> Unit = {},
+    onNavigateToMessages: () -> Unit = {},
+    isOnline: Boolean,
+    viewModel: HomeViewModel
 ) {
+    val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
     val categories by viewModel.categories.collectAsState()
     val selectedCategoryId by viewModel.selectedCategoryId.collectAsState()
-    val focusManager = LocalFocusManager.current
+    val selectedPriceCap by viewModel.selectedPriceCap.collectAsState()
+    val isLandscape = LocalConfiguration.current.screenWidthDp > LocalConfiguration.current.screenHeightDp
+    val offlineBannerController = rememberOfflineBannerController(isOnline)
 
-    Scaffold(
-        topBar = {
-            Column(modifier = Modifier.background(MarketplacePrimary)) {
-                CenterAlignedTopAppBar(
-                    title = {
-                        Text(
-                            "Marketplace",
-                            color = MarketplaceWhite,
-                            fontWeight = FontWeight.Bold
-                        )
-                    },
-                    actions = {
-                        IconButton(onClick = onNavigateToProfile) {
-                            Icon(Icons.Default.Person, contentDescription = "Profile", tint = MarketplaceWhite)
-                        }
-                    },
-                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                        containerColor = MarketplacePrimary
-                    )
-                )
-                SearchBar(
-                    query = searchQuery,
-                    onQueryChange = { viewModel.onSearchQueryChanged(it) },
-                    onSearch = { focusManager.clearFocus() },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp)
-                )
-            }
-        },
-        bottomBar = {
-            MarketplaceBottomNavigation(
-                currentRoute = "home",
-                onNavigate = { route ->
-                    when (route) {
-                        "create_listing" -> onNavigateToSell()
-                        "purchase_history" -> onNavigateToPurchases()
-                        "conversations" -> onNavigateToMessages()
-                        "profile" -> onNavigateToProfile()
-                    }
-                }
-            )
-        }
-    ) { padding ->
-        Column(modifier = Modifier.padding(padding)) {
-            CategoryFilter(
-                categories = categories,
-                selectedCategoryId = selectedCategoryId,
-                onCategorySelected = { viewModel.onCategorySelected(it) }
-            )
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) {
+        viewModel.refreshUserLocation()
+    }
 
-            Box(modifier = Modifier.fillMaxSize()) {
-                when (val state = uiState) {
-                    is HomeUiState.Loading -> {
-                        CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-                    }
-                    is HomeUiState.Error -> {
-                        ErrorMessage(
-                            message = state.message,
-                            onRetry = { viewModel.loadListings() },
-                            modifier = Modifier.align(Alignment.Center)
-                        )
-                    }
-                    is HomeUiState.Success -> {
-                        ListingsContent(
-                            featured = state.featured,
-                            recent = state.recent,
-                            isSearching = state.isSearching,
-                            onListingClick = onNavigateToDetail,
-                            onRefresh = { viewModel.loadListings() }
-                        )
-                    }
-                }
-            }
+    LaunchedEffect(isOnline) {
+        if (isOnline) {
+            viewModel.loadListings()
+        } else {
+            viewModel.showOfflineState()
         }
     }
 
-    if (!isOnline) {
-        LaunchedEffect(Unit) {
-            viewModel.showOfflineState()
+    LaunchedEffect(Unit) {
+        if (hasLocationPermission(context)) {
+            viewModel.refreshUserLocation()
+        } else {
+            permissionLauncher.launch(
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                )
+            )
+        }
+    }
+
+    Scaffold(
+        bottomBar = {
+            if (!isLandscape) {
+                MarketplaceBottomNavigation(
+                    currentRoute = "home",
+                    onNavigate = { route ->
+                        when (route) {
+                            "profile" -> onNavigateToProfile()
+                            "create_listing" -> onNavigateToSell()
+                            "purchase_history" -> onNavigateToPurchases()
+                            "conversations" -> onNavigateToMessages()
+                        }
+                    }
+                )
+            }
+        }
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .padding(padding)
+                .fillMaxSize()
+                .background(Color.White)
+        ) {
+            OfflineBanner(
+                isOnline = isOnline,
+                offlineBannerController = offlineBannerController,
+                message = "Sin conexion. Algunas funciones pueden no estar disponibles."
+            )
+
+            SearchHeader(
+                searchQuery = searchQuery,
+                isOnline = isOnline,
+                categories = categories,
+                selectedCategoryId = selectedCategoryId,
+                selectedPriceCap = selectedPriceCap,
+                onQueryChanged = viewModel::onSearchQueryChanged,
+                onCategorySelected = viewModel::onCategorySelected,
+                onPriceSelected = viewModel::onPriceCapSelected
+            )
+
+            when (val state = uiState) {
+                is HomeUiState.Loading -> {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = MarketplaceYellow)
+                    }
+                }
+                is HomeUiState.Error -> {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text(text = state.message, color = Color.Red, modifier = Modifier.padding(16.dp))
+                    }
+                }
+                is HomeUiState.Success -> {
+                    val onListingClick: (ListingUiModel) -> Unit = { listing ->
+                        viewModel.onListingOpened(listing)
+                        onNavigateToDetail(listing.id)
+                    }
+
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(bottom = 16.dp)
+                    ) {
+                        if (state.isSearching) {
+                            item { SectionTitle("Resultados") }
+                            val results = state.featured + state.recent
+                            if (results.isEmpty()) {
+                                item {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(24.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text("No se encontraron productos", color = Color.Gray)
+                                    }
+                                }
+                            } else {
+                                items(results, key = { it.id }) { listing ->
+                                    SearchResultCard(listing = listing, onClick = { onListingClick(listing) })
+                                }
+                            }
+                        } else {
+                            item {
+                                SectionTitle("Destacados")
+                                LazyRow(
+                                    contentPadding = PaddingValues(horizontal = 16.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                                ) {
+                                    items(state.featured, key = { it.id }) { listing ->
+                                        FeaturedProductCard(listing = listing, onClick = { onListingClick(listing) })
+                                    }
+                                }
+                            }
+                            item { SectionTitle("Publicaciones recientes") }
+                            items(state.recent, key = { it.id }) { listing ->
+                                SearchResultCard(listing = listing, onClick = { onListingClick(listing) })
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }
 
 @Composable
-fun SearchBar(
-    query: String,
-    onQueryChange: (String) -> Unit,
-    onSearch: (String) -> Unit,
-    modifier: Modifier = Modifier
+private fun SearchHeader(
+    searchQuery: String,
+    isOnline: Boolean,
+    categories: List<Category>,
+    selectedCategoryId: String?,
+    selectedPriceCap: Int?,
+    onQueryChanged: (String) -> Unit,
+    onCategorySelected: (String?) -> Unit,
+    onPriceSelected: (Int?) -> Unit
 ) {
-    Surface(
-        modifier = modifier.height(56.dp),
-        shape = RoundedCornerShape(28.dp),
-        color = MarketplaceWhite,
-        tonalElevation = 2.dp
+    val priceOptions = listOf<Int?>(null, 100_000, 300_000, 500_000, 1_000_000)
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MarketplaceYellow)
+            .padding(top = 8.dp, bottom = 8.dp)
     ) {
         Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(horizontal = 16.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(Icons.Default.Search, contentDescription = null, tint = Color.Gray)
             TextField(
-                value = query,
-                onValueChange = onQueryChange,
-                placeholder = { Text("Search products...", color = Color.Gray) },
-                modifier = Modifier.weight(1f),
+                value = searchQuery,
+                onValueChange = { if (isOnline) onQueryChanged(it) },
+                modifier = Modifier
+                    .weight(1f)
+                    .height(52.dp)
+                    .clip(RoundedCornerShape(26.dp)),
+                placeholder = {
+                    Text(
+                        if (isOnline) "Buscar productos..." else "Sin conexión",
+                        color = Color.Gray,
+                        fontSize = 14.sp
+                    )
+                },
+                leadingIcon = {
+                    Icon(
+                        Icons.Default.Search,
+                        contentDescription = null,
+                        tint = Color.Gray,
+                        modifier = Modifier.size(20.dp)
+                    )
+                },
                 colors = TextFieldDefaults.colors(
-                    focusedContainerColor = Color.Transparent,
-                    unfocusedContainerColor = Color.Transparent,
-                    disabledContainerColor = Color.Transparent,
+                    focusedContainerColor = MarketplaceWhite,
+                    unfocusedContainerColor = MarketplaceWhite,
+                    disabledContainerColor = MarketplaceWhite,
                     focusedIndicatorColor = Color.Transparent,
                     unfocusedIndicatorColor = Color.Transparent
                 ),
                 singleLine = true,
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                keyboardActions = KeyboardActions(onSearch = { onSearch(query) })
+                enabled = isOnline
             )
-            if (query.isNotEmpty()) {
-                IconButton(onClick = { onQueryChange("") }) {
-                    Icon(Icons.Default.Close, contentDescription = "Clear")
-                }
+            Spacer(modifier = Modifier.width(8.dp))
+            IconButton(onClick = { }, modifier = Modifier.size(48.dp)) {
+                Icon(Icons.Default.Notifications, contentDescription = "Notificaciones", tint = MarketplaceDark)
             }
         }
-    }
-}
 
-@Composable
-fun CategoryFilter(
-    categories: List<Category>,
-    selectedCategoryId: String?,
-    onCategorySelected: (String?) -> Unit
-) {
-    LazyRow(
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        items(categories) { category ->
-            val selected = category.id == selectedCategoryId
-            FilterChip(
-                selected = selected,
-                onClick = { onCategorySelected(category.id) },
-                label = { Text(category.name) },
-                colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = MarketplaceSecondary,
-                    selectedLabelColor = MarketplaceWhite
-                ),
-                border = FilterChipDefaults.filterChipBorder(
-                    enabled = true,
-                    selected = selected,
-                    borderColor = Color.LightGray,
-                    selectedBorderColor = MarketplaceSecondary
+        Spacer(modifier = Modifier.height(8.dp))
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            item {
+                FilterChip(
+                    selected = selectedCategoryId == null,
+                    onClick = { onCategorySelected(null) },
+                    label = { Text("Todo") },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = MarketplaceWhite,
+                        containerColor = Color.White.copy(alpha = 0.65f)
+                    )
                 )
-            )
-        }
-    }
-}
-
-@Composable
-fun ListingsContent(
-    featured: List<ListingUiModel>,
-    recent: List<ListingUiModel>,
-    isSearching: Boolean,
-    onListingClick: (String) -> Unit,
-    onRefresh: () -> Unit
-) {
-    if (featured.isEmpty() && recent.isEmpty()) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text("No results found")
-        }
-        return
-    }
-
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(bottom = 16.dp)
-    ) {
-        if (!isSearching && featured.isNotEmpty()) {
-            item {
-                SectionTitle("Featured Items")
-                FeaturedList(featured, onListingClick)
+            }
+            items(categories, key = { it.id }) { category ->
+                FilterChip(
+                    selected = selectedCategoryId == category.id,
+                    onClick = { onCategorySelected(category.id) },
+                    label = { Text(category.name) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = MarketplaceWhite,
+                        containerColor = Color.White.copy(alpha = 0.65f)
+                    )
+                )
             }
         }
 
-        if (recent.isNotEmpty()) {
-            item {
-                SectionTitle(if (isSearching) "Search Results" else "Recent Listings")
-            }
-            items(recent) { listing ->
-                ListingItem(listing, onClick = { onListingClick(listing.id) })
+        Spacer(modifier = Modifier.height(8.dp))
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            items(priceOptions, key = { it ?: -1 }) { cap ->
+                val label = cap?.let {
+                    "Hasta ${String.format(Locale.US, "%,d", it).replace(',', '.')}"
+                } ?: "Sin tope"
+
+                FilterChip(
+                    selected = selectedPriceCap == cap,
+                    onClick = { onPriceSelected(cap) },
+                    label = { Text(label) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = MarketplaceWhite,
+                        containerColor = Color.White.copy(alpha = 0.65f)
+                    )
+                )
             }
         }
     }
@@ -254,88 +344,119 @@ fun ListingsContent(
 fun SectionTitle(title: String) {
     Text(
         text = title,
-        fontSize = 18.sp,
-        fontWeight = FontWeight.Bold,
-        modifier = Modifier.padding(16.dp)
+        style = MaterialTheme.typography.titleLarge,
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp)
     )
 }
 
 @Composable
-fun FeaturedList(listings: List<ListingUiModel>, onListingClick: (String) -> Unit) {
-    LazyRow(
-        contentPadding = PaddingValues(horizontal = 16.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        items(listings) { listing ->
-            FeaturedItem(listing, onClick = { onListingClick(listing.id) })
-        }
-    }
-}
-
-@Composable
-fun FeaturedItem(listing: ListingUiModel, onClick: () -> Unit) {
-    Card(
-        modifier = Modifier
-            .width(200.dp)
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(12.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Column {
-            AsyncImage(
-                model = listing.imageUrl,
-                contentDescription = null,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(120.dp),
-                contentScale = ContentScale.Crop
-            )
-            Column(modifier = Modifier.padding(12.dp)) {
-                Text(listing.name, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text("$\${listing.price}", color = MarketplaceSecondary, fontWeight = FontWeight.Bold)
+fun FeaturedProductCard(listing: ListingUiModel, onClick: () -> Unit) {
+    Column(modifier = Modifier.width(160.dp)) {
+        DistanceLabel(distance = listing.distance)
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onClick() },
+            shape = RoundedCornerShape(8.dp),
+            colors = CardDefaults.cardColors(containerColor = MarketplaceWhite),
+            elevation = CardDefaults.cardElevation(2.dp)
+        ) {
+            Box {
+                Column {
+                    AsyncImage(
+                        model = listing.imageUrl,
+                        contentDescription = null,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(160.dp),
+                        contentScale = ContentScale.Crop
+                    )
+                    Column(modifier = Modifier.padding(8.dp)) {
+                        Text(text = listing.name, fontSize = 14.sp, maxLines = 2, minLines = 2)
+                        Text(
+                            text = "$ ${String.format(Locale.US, "%,.0f", listing.price).replace(',', '.')}",
+                            fontSize = 16.sp
+                        )
+                    }
+                }
+                Surface(
+                    modifier = Modifier.padding(8.dp),
+                    color = MarketplaceYellow,
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text(
+                        text = "Destacado",
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                        fontSize = 10.sp
+                    )
+                }
             }
         }
     }
 }
 
 @Composable
-fun ListingItem(listing: ListingUiModel, onClick: () -> Unit) {
-    Row(
+fun SearchResultCard(listing: ListingUiModel, onClick: () -> Unit) {
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .padding(horizontal = 16.dp, vertical = 4.dp)
     ) {
-        AsyncImage(
-            model = listing.imageUrl,
-            contentDescription = null,
+        DistanceLabel(distance = listing.distance)
+        Card(
             modifier = Modifier
-                .size(80.dp)
-                .clip(RoundedCornerShape(8.dp)),
-            contentScale = ContentScale.Crop
-        )
-        Spacer(modifier = Modifier.width(16.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(listing.name, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
-            Text(listing.category, color = Color.Gray, fontSize = 14.sp)
-            Text("$\${listing.price}", color = MarketplaceSecondary, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                .fillMaxWidth()
+                .clickable { onClick() },
+            colors = CardDefaults.cardColors(containerColor = MarketplaceWhite),
+            elevation = CardDefaults.cardElevation(1.dp)
+        ) {
+            Row(
+                modifier = Modifier.padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                AsyncImage(
+                    model = listing.imageUrl,
+                    contentDescription = null,
+                    modifier = Modifier
+                        .size(80.dp)
+                        .clip(RoundedCornerShape(8.dp)),
+                    contentScale = ContentScale.Crop
+                )
+                Spacer(modifier = Modifier.width(16.dp))
+                Column {
+                    Text(text = listing.name, fontSize = 16.sp)
+                    Text(
+                        text = "$ ${String.format(Locale.US, "%,.0f", listing.price).replace(',', '.')}",
+                        color = Color.Gray
+                    )
+                }
+            }
         }
-        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = Color.LightGray)
     }
 }
 
 @Composable
-fun ErrorMessage(message: String, onRetry: () -> Unit, modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier.padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(message, color = Color.Red)
-        Button(onClick = onRetry, modifier = Modifier.padding(top = 8.dp)) {
-            Text("Retry")
-        }
-    }
+private fun DistanceLabel(distance: String?) {
+    Text(
+        text = distance ?: "Aprox. distancia no disponible",
+        fontSize = 12.sp,
+        color = Color.Gray,
+        modifier = Modifier.padding(bottom = 6.dp)
+    )
+}
+
+private fun hasLocationPermission(context: Context): Boolean {
+    val hasFineLocation = ContextCompat.checkSelfPermission(
+        context,
+        Manifest.permission.ACCESS_FINE_LOCATION
+    ) == PackageManager.PERMISSION_GRANTED
+
+    val hasCoarseLocation = ContextCompat.checkSelfPermission(
+        context,
+        Manifest.permission.ACCESS_COARSE_LOCATION
+    ) == PackageManager.PERMISSION_GRANTED
+
+    return hasFineLocation || hasCoarseLocation
 }
 
 @Composable
@@ -349,7 +470,7 @@ fun MarketplaceBottomNavigation(
     ) {
         val items = listOf(
             BottomNavItem("Home", Icons.Filled.Home, Icons.Outlined.Home, route = "home"),
-            BottomNavItem("Purchases", Icons.Filled.ShoppingBag, Icons.Outlined.ShoppingBag, route = "purchase_history"),
+            BottomNavItem("Purchases", Icons.Filled.Search, Icons.Filled.Search, route = "purchase_history"),
             BottomNavItem("Sell", Icons.Filled.Add, Icons.Outlined.Add, route = "create_listing"),
             BottomNavItem("Messages", Icons.Filled.ChatBubble, Icons.Outlined.ChatBubbleOutline, route = "conversations"),
             BottomNavItem("Profile", Icons.Filled.Person, Icons.Outlined.PersonOutline, route = "profile")
@@ -359,11 +480,19 @@ fun MarketplaceBottomNavigation(
             val selected = item.route == currentRoute
             NavigationBarItem(
                 icon = {
-                    Icon(if (selected) item.selectedIcon else item.unselectedIcon, contentDescription = item.title)
+                    Icon(
+                        if (selected) item.selectedIcon else item.unselectedIcon,
+                        contentDescription = item.title
+                    )
                 },
-                label = { Text(item.title) },
+                label = { Text(item.title, fontSize = 10.sp) },
                 selected = selected,
-                onClick = { onNavigate(item.route) }
+                onClick = { onNavigate(item.route) },
+                colors = NavigationBarItemDefaults.colors(
+                    selectedIconColor = Color(0xFF1E88E5),
+                    unselectedIconColor = Color.Gray,
+                    indicatorColor = Color.Transparent
+                )
             )
         }
     }

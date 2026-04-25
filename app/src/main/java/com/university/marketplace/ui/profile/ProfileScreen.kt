@@ -49,6 +49,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.university.marketplace.data.toUserFriendlyMessage
 import com.university.marketplace.data.auth.AuthException
 import com.university.marketplace.data.auth.AuthRepository
 import com.university.marketplace.data.auth.UnauthorizedAuthException

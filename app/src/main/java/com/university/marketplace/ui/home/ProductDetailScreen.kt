@@ -66,20 +66,29 @@ fun ProductDetailScreen(
     var userCoordinates by rememberSaveable(stateSaver = UserCoordinatesSaver) {
         mutableStateOf<Pair<Double, Double>?>(null)
     }
-    var showPurchaseDialog by remember { mutableStateOf(false) }
-    val snackbarHostState = remember { SnackbarHostState() }
 
-    val permissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions()
-    ) { permissions ->
-        if (permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
-            permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+    val updateLocation: () -> Unit = {
+        if (
+            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
         ) {
-            fusedLocationClient.lastLocation.addOnSuccessListener { location ->
-                location?.let { userCoordinates = it.latitude to it.longitude }
-            }
+            fusedLocationClient.lastLocation
+                .addOnSuccessListener { location ->
+                    if (location != null) {
+                        userCoordinates = location.latitude to location.longitude
+                    }
+                }
         }
     }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) {
+        updateLocation()
+    }
+
+    var showPurchaseDialog by remember { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(purchaseState) {
         when (val ps = purchaseState) {
@@ -254,9 +263,9 @@ fun ProductDetailScreen(
                                     listing.longitude
                                 )
                                 String.format(Locale.US, "%s • %.1f km away", listing.locationName, distanceKm)
-                            } ?: "\${listing.locationName} • distance unavailable"
+                            } ?: "${listing.locationName} • distance unavailable"
                         } else {
-                            "\${listing.locationName} • location unavailable"
+                            "${listing.locationName} • location unavailable"
                         }
                     }
                     if (isWideScreen()) {
@@ -355,7 +364,7 @@ private fun ListingDetailBody(
         }
 
         Text(
-            text = "$\${listing.price.toInt()}",
+            text = "$${listing.price.toInt()}",
             color = MarketplaceYellow,
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.ExtraBold,
