@@ -35,11 +35,17 @@ import com.university.marketplace.ui.auth.SignInScreen
 import com.university.marketplace.ui.auth.SignUpScreen
 import com.university.marketplace.ui.MarketplaceViewModelFactory
 import com.university.marketplace.ui.home.HomeMarketplaceScreen
-import com.university.marketplace.ui.home.HomeViewModel
 import com.university.marketplace.ui.home.CreateListingScreen
+import com.university.marketplace.ui.home.CreateListingViewModel
+import com.university.marketplace.ui.home.HomeViewModel
 import com.university.marketplace.ui.home.ListingDetailViewModel
 import com.university.marketplace.ui.home.ProductDetailScreen
+import com.university.marketplace.ui.profile.MyListingsViewModel
 import com.university.marketplace.ui.profile.ProfileRoute
+import com.university.marketplace.ui.purchases.PurchaseHistoryScreen
+import com.university.marketplace.ui.purchases.PurchaseHistoryViewModel
+import com.university.marketplace.ui.purchases.SalesHistoryScreen
+import com.university.marketplace.ui.purchases.SalesHistoryViewModel
 import com.university.marketplace.ui.theme.JetpackComposeAppTheme
 
 class MainActivity : ComponentActivity() {
@@ -50,19 +56,20 @@ class MainActivity : ComponentActivity() {
                 ?: DefaultAppContainer(applicationContext)
         setContent {
             JetpackComposeAppTheme {
-                AppNavigation(factory = MarketplaceViewModelFactory(container))
+                AppNavigation(container = container)
             }
         }
     }
 }
 
 @Composable
-fun AppNavigation(factory: MarketplaceViewModelFactory) {
+fun AppNavigation(container: com.university.marketplace.di.AppContainer) {
     val navController = rememberNavController()
     val context = LocalContext.current
     val connectivityMonitor = remember { AndroidConnectivityMonitor(context.applicationContext) }
     val isOnline by connectivityMonitor.isOnline.collectAsState(initial = connectivityMonitor.isCurrentlyOnline())
     val authRepository = remember { AuthRepositoryFactory.create(context.applicationContext) }
+    val factory = remember(container, authRepository) { MarketplaceViewModelFactory(container, authRepository) }
     val coroutineScope = rememberCoroutineScope()
     val startDestination = if (authRepository.hasActiveSession()) "home" else "sign_in"
     
@@ -158,10 +165,14 @@ fun AppNavigation(factory: MarketplaceViewModelFactory) {
                     // Allowed even offline (Eventual connectivity)
                     navController.navigate("create_listing")
                 },
+                onNavigateToPurchases = {
+                    navController.navigate("purchase_history")
+                },
                 isOnline = isOnline
             )
         }
         composable("profile") {
+            val myListingsViewModel: MyListingsViewModel = viewModel(factory = factory)
             ProfileRoute(
                 authRepository = authRepository,
                 isOnline = isOnline,
@@ -172,7 +183,10 @@ fun AppNavigation(factory: MarketplaceViewModelFactory) {
                     navController.navigate("create_listing")
                 },
                 onLogout = onLogout,
-                onUnauthorized = onUnauthorized
+                onUnauthorized = onUnauthorized,
+                myListingsViewModel = myListingsViewModel,
+                onNavigateToDetail = { id -> navController.navigate("product_detail/$id") },
+                onNavigateToSales = { navController.navigate("sales_history") }
             )
         }
         composable(
@@ -195,13 +209,11 @@ fun AppNavigation(factory: MarketplaceViewModelFactory) {
             }
         }
         composable("create_listing") {
+            val createListingViewModel: CreateListingViewModel = viewModel(factory = factory)
             CreateListingScreen(
                 onBack = { navController.popBackStack() },
                 isOnline = isOnline,
-                onCreateListing = { _, _, _, _ ->
-                    Toast.makeText(context, "Publicación creada correctamente.", Toast.LENGTH_SHORT).show()
-                    navController.popBackStack()
-                }
+                viewModel = createListingViewModel
             )
         }
         composable(
@@ -219,6 +231,22 @@ fun AppNavigation(factory: MarketplaceViewModelFactory) {
                     viewModel = detailViewModel
                 )
             }
+        }
+        composable("purchase_history") {
+            val purchaseHistoryViewModel: PurchaseHistoryViewModel = viewModel(factory = factory)
+            PurchaseHistoryScreen(
+                isOnline = isOnline,
+                onBack = { navController.popBackStack() },
+                viewModel = purchaseHistoryViewModel
+            )
+        }
+        composable("sales_history") {
+            val salesHistoryViewModel: SalesHistoryViewModel = viewModel(factory = factory)
+            SalesHistoryScreen(
+                isOnline = isOnline,
+                onBack = { navController.popBackStack() },
+                viewModel = salesHistoryViewModel
+            )
         }
     }
 }

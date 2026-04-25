@@ -39,19 +39,41 @@ private val UriSaver: Saver<Uri?, String> = Saver(
 fun CreateListingScreen(
     onBack: () -> Unit,
     isOnline: Boolean,
-    onCreateListing: (title: String, price: Double, description: String, condition: String) -> Unit = { _, _, _, _ -> }
+    viewModel: CreateListingViewModel? = null
 ) {
     var title by rememberSaveable { mutableStateOf("") }
     var price by rememberSaveable { mutableStateOf("") }
     var description by rememberSaveable { mutableStateOf("") }
-    var selectedCondition by rememberSaveable { mutableStateOf("New") }
+    var selectedCondition by rememberSaveable { mutableStateOf("new") }
+    var location by rememberSaveable { mutableStateOf("") }
     var imageUri by rememberSaveable(stateSaver = UriSaver) { mutableStateOf<Uri?>(null) }
+    var categoryMenuExpanded by remember { mutableStateOf(false) }
+    var selectedCategoryId by rememberSaveable { mutableStateOf("") }
+    var selectedCategoryName by rememberSaveable { mutableStateOf("Select category") }
 
     val galleryLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri -> imageUri = uri }
 
+    val uiState by (viewModel?.uiState?.collectAsState() ?: remember { mutableStateOf(CreateListingUiState.Idle) })
+    val categories by (viewModel?.categories?.collectAsState() ?: remember { mutableStateOf(emptyList()) })
+
+    LaunchedEffect(uiState) {
+        if (uiState is CreateListingUiState.Success) onBack()
+    }
+
+    val snackbarHostState = remember { SnackbarHostState() }
+    LaunchedEffect(uiState) {
+        if (uiState is CreateListingUiState.Error) {
+            snackbarHostState.showSnackbar((uiState as CreateListingUiState.Error).message)
+            viewModel?.resetError()
+        }
+    }
+
+    val isLoading = uiState is CreateListingUiState.Loading
+
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             CenterAlignedTopAppBar(
                 title = { Text("Crear publicación", fontWeight = FontWeight.Bold, fontSize = 18.sp) },
@@ -67,41 +89,41 @@ fun CreateListingScreen(
             Box(modifier = Modifier.padding(16.dp).navigationBarsPadding()) {
                 Button(
                     onClick = {
-                        val parsedPrice = price.trim().replace(",", ".").toDoubleOrNull()
-                        val normalizedTitle = title.trim()
-                        val normalizedDescription = description.trim()
-                        if (normalizedTitle.isBlank() || normalizedDescription.isBlank() || parsedPrice == null || parsedPrice <= 0.0) {
-                            android.widget.Toast.makeText(
-                                context,
-                                "Completa título, precio y descripción válidos.",
-                                android.widget.Toast.LENGTH_SHORT
-                            ).show()
-                            return@Button
+                        val priceInt = price.toIntOrNull() ?: 0
+                        val conditionApi = when (selectedCondition) {
+                            "Like New" -> "like_new"
+                            "Used" -> "used"
+                            else -> "new"
                         }
-                        onCreateListing(
-                            normalizedTitle,
-                            parsedPrice,
-                            normalizedDescription,
-                            selectedCondition.lowercase()
-                        )
-                        // Mock success for offline mode
-                        if (!isOnline) {
-                            android.widget.Toast.makeText(context, "Publicación guardada localmente", android.widget.Toast.LENGTH_SHORT).show()
-                            onBack()
+                        val images = if (imageUri != null) listOf(imageUri.toString()) else emptyList()
+                        if (viewModel != null) {
+                            viewModel.submit(
+                                categoryId = selectedCategoryId,
+                                title = title,
+                                description = description,
+                                price = priceInt,
+                                condition = conditionApi,
+                                images = images,
+                                location = location
+                            )
                         }
                     },
                     modifier = Modifier.fillMaxWidth().height(56.dp),
                     shape = RoundedCornerShape(28.dp),
-                    // ALLOW CREATING OFFLINE (Eventual connectivity)
-                    enabled = true,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MarketplaceYellow,
-                        contentColor = MarketplaceDark
-                    )
+                    enabled = isOnline && !isLoading,
+                    colors = ButtonDefaults.buttonColors(containerColor = MarketplaceYellow)
                 ) {
-                    Icon(Icons.Default.Send, contentDescription = null)
-                    Spacer(Modifier.width(8.dp))
-                    Text("Crear", fontWeight = FontWeight.Bold)
+                    if (isLoading) {
+                        CircularProgressIndicator(
+                            color = MarketplaceDark,
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Icon(Icons.Default.Send, contentDescription = null, tint = MarketplaceDark)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Post Listing", color = MarketplaceDark, fontWeight = FontWeight.Bold)
+                    }
                 }
             }
         }
@@ -155,6 +177,24 @@ fun CreateListingScreen(
                                 label = "$ Price"
                             )
                             Spacer(modifier = Modifier.height(12.dp))
+                            CategoryDropdown(
+                                categories = categories.map { it.id to it.name },
+                                selectedName = selectedCategoryName,
+                                expanded = categoryMenuExpanded,
+                                onExpandChange = { categoryMenuExpanded = it },
+                                onSelected = { id, name ->
+                                    selectedCategoryId = id
+                                    selectedCategoryName = name
+                                    categoryMenuExpanded = false
+                                }
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            MarketplaceTextField(
+                                value = location,
+                                onValueChange = { location = it },
+                                label = "Location (e.g. Bogotá)"
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
                             MarketplaceTextField(
                                 value = description,
                                 onValueChange = { description = it },
@@ -182,6 +222,24 @@ fun CreateListingScreen(
                         value = price,
                         onValueChange = { price = it },
                         label = "$ Price"
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    CategoryDropdown(
+                        categories = categories.map { it.id to it.name },
+                        selectedName = selectedCategoryName,
+                        expanded = categoryMenuExpanded,
+                        onExpandChange = { categoryMenuExpanded = it },
+                        onSelected = { id, name ->
+                            selectedCategoryId = id
+                            selectedCategoryName = name
+                            categoryMenuExpanded = false
+                        }
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    MarketplaceTextField(
+                        value = location,
+                        onValueChange = { location = it },
+                        label = "Location (e.g. Bogotá)"
                     )
 
                     Spacer(modifier = Modifier.height(24.dp))
@@ -215,6 +273,49 @@ fun CreateListingScreen(
                         style = MaterialTheme.typography.bodySmall
                     )
                 }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CategoryDropdown(
+    categories: List<Pair<String, String>>,
+    selectedName: String,
+    expanded: Boolean,
+    onExpandChange: (Boolean) -> Unit,
+    onSelected: (String, String) -> Unit
+) {
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = onExpandChange
+    ) {
+        TextField(
+            value = selectedName,
+            onValueChange = {},
+            readOnly = true,
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            modifier = Modifier
+                .fillMaxWidth()
+                .menuAnchor()
+                .clip(RoundedCornerShape(12.dp)),
+            colors = TextFieldDefaults.colors(
+                focusedContainerColor = MarketplaceWhite,
+                unfocusedContainerColor = MarketplaceWhite,
+                focusedIndicatorColor = Color.Transparent,
+                unfocusedIndicatorColor = Color.Transparent
+            )
+        )
+        ExposedDropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { onExpandChange(false) }
+        ) {
+            categories.forEach { (id, name) ->
+                DropdownMenuItem(
+                    text = { Text(name) },
+                    onClick = { onSelected(id, name) }
+                )
             }
         }
     }
@@ -283,7 +384,7 @@ fun ConditionToggleGroup(selectedCondition: String, onConditionSelected: (String
         modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Color(0xFFF1F1F1))
     ) {
         options.forEach { option ->
-            val isSelected = selectedCondition == option
+            val isSelected = selectedCondition.equals(option, ignoreCase = true)
             Box(
                 modifier = Modifier
                     .weight(1f)
