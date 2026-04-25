@@ -22,6 +22,7 @@ import com.university.marketplace.di.DefaultAppContainer
 import com.university.marketplace.data.auth.AuthRepositoryFactory
 import com.university.marketplace.data.auth.UnauthorizedAuthException
 import com.university.marketplace.connectivity.AndroidConnectivityMonitor
+import com.university.marketplace.data.location.AndroidLocationRepository
 import com.university.marketplace.map.MapViewModel
 import com.university.marketplace.map.MapViewScreen
 import com.university.marketplace.ui.auth.AuthViewModel
@@ -56,6 +57,8 @@ fun AppNavigation(factory: MarketplaceViewModelFactory) {
     val connectivityMonitor = remember { AndroidConnectivityMonitor(context.applicationContext) }
     val isOnline by connectivityMonitor.isOnline.collectAsState(initial = connectivityMonitor.isCurrentlyOnline())
     val authRepository = remember { AuthRepositoryFactory.create(context.applicationContext) }
+    val locationRepository = remember { AndroidLocationRepository(context.applicationContext) }
+
     val coroutineScope = rememberCoroutineScope()
     val startDestination = if (authRepository.hasActiveSession()) "home" else "sign_in"
     val navigateToTopLevel: (String) -> Unit = { route ->
@@ -89,7 +92,7 @@ fun AppNavigation(factory: MarketplaceViewModelFactory) {
     NavHost(navController = navController, startDestination = startDestination) {
         composable("sign_in") {
             val authViewModel = viewModel<AuthViewModel>(
-                factory = AuthViewModelFactory(authRepository)
+                factory = AuthViewModelFactory(authRepository, locationRepository)
             )
             SignInScreen(
                 isOnline = isOnline,
@@ -107,7 +110,7 @@ fun AppNavigation(factory: MarketplaceViewModelFactory) {
         }
         composable("sign_up") {
             val authViewModel = viewModel<AuthViewModel>(
-                factory = AuthViewModelFactory(authRepository)
+                factory = AuthViewModelFactory(authRepository, locationRepository)
             )
             SignUpScreen(
                 isOnline = isOnline,

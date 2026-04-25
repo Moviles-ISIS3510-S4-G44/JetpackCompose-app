@@ -16,9 +16,11 @@ if (secretsFile.exists()) {
 }
 
 val apiBaseUrl =
-    secretsProperties.getProperty("API_BASE_URL")
+    (secretsProperties.getProperty("API_BASE_URL")
         ?: (project.findProperty("API_BASE_URL") as String?)
-        ?: "http://172.17.0.1:8000/"
+        ?: "https://uniandesmarketplacebackend.onrender.com/")
+        .trim()
+        .removeSurrounding("\"")
 
 android {
     namespace = "com.university.marketplace"
@@ -71,6 +73,7 @@ android {
     }
 }
 
+
 kotlin {
     compilerOptions {
         jvmTarget.set(JvmTarget.JVM_17)
@@ -83,6 +86,7 @@ dependencies {
     implementation(composeBom)
     androidTestImplementation(composeBom)
 
+    implementation(platform("com.google.firebase:firebase-bom:32.7.0"))
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.6")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.6")
@@ -121,6 +125,10 @@ dependencies {
 
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
+
+    implementation(platform("com.google.firebase:firebase-bom:34.12.0"))
+
+    implementation("com.google.firebase:firebase-analytics")
 }
 
 val testClasses by tasks.registering {
