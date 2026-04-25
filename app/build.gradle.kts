@@ -5,7 +5,6 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
-    id("com.google.devtools.ksp")
 }
 
 val secretsProperties = Properties()
@@ -16,7 +15,12 @@ if (secretsFile.exists()) {
     }
 }
 
-val apiBaseUrl = "https://uniandesmarketplacebackend.onrender.com/"
+val apiBaseUrl =
+    (secretsProperties.getProperty("API_BASE_URL")
+        ?: (project.findProperty("API_BASE_URL") as String?)
+        ?: "https://uniandesmarketplacebackend.onrender.com/")
+        .trim()
+        .removeSurrounding("\"")
 
 android {
     namespace = "com.university.marketplace"
@@ -40,7 +44,6 @@ android {
                 ?: "YOUR_MAPS_API_KEY"
 
         buildConfigField("String", "API_BASE_URL", "\"$apiBaseUrl\"")
-        buildConfigField("String", "GROQ_API_KEY", "\"${secretsProperties.getProperty("GROQ_API_KEY") ?: ""}\"")
     }
 
     buildTypes {
@@ -68,11 +71,8 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
-
-    androidResources {
-        noCompress += "tflite"
-    }
 }
+
 
 kotlin {
     compilerOptions {
@@ -86,6 +86,7 @@ dependencies {
     implementation(composeBom)
     androidTestImplementation(composeBom)
 
+    implementation(platform("com.google.firebase:firebase-bom:32.7.0"))
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.6")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.6")
@@ -105,23 +106,13 @@ dependencies {
     // Image Loading
     implementation("io.coil-kt:coil-compose:2.7.0")
 
-    // Networking
     implementation("com.squareup.retrofit2:retrofit:2.11.0")
     implementation("com.squareup.retrofit2:converter-gson:2.11.0")
+    // Networking
+    implementation("com.squareup.retrofit2:retrofit:2.11.0")
     implementation("com.squareup.retrofit2:converter-moshi:2.11.0")
-    implementation("com.google.code.gson:gson:2.11.0")
     implementation("com.squareup.moshi:moshi-kotlin:1.15.1")
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
-
-    // Room
-    val roomVersion = "2.6.1"
-    implementation("androidx.room:room-runtime:$roomVersion")
-    implementation("androidx.room:room-ktx:$roomVersion")
-    ksp("androidx.room:room-compiler:$roomVersion")
-
-    // TFLite
-    implementation("org.tensorflow:tensorflow-lite:2.16.1")
-    implementation("org.tensorflow:tensorflow-lite-support:0.4.4")
 
     implementation("com.google.maps.android:maps-compose:6.1.0")
     implementation("com.google.android.gms:play-services-maps:19.0.0")
@@ -134,6 +125,10 @@ dependencies {
 
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
+
+    implementation(platform("com.google.firebase:firebase-bom:34.12.0"))
+
+    implementation("com.google.firebase:firebase-analytics")
 }
 
 val testClasses by tasks.registering {

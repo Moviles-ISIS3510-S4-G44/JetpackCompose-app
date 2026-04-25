@@ -27,6 +27,7 @@ import com.university.marketplace.data.auth.AuthException
 import com.university.marketplace.data.auth.AuthRepositoryFactory
 import com.university.marketplace.data.auth.UnauthorizedAuthException
 import com.university.marketplace.connectivity.AndroidConnectivityMonitor
+import com.university.marketplace.data.location.AndroidLocationRepository
 import com.university.marketplace.map.MapViewModel
 import com.university.marketplace.map.MapViewScreen
 import com.university.marketplace.ui.auth.AuthViewModel
@@ -76,6 +77,8 @@ fun AppNavigation(container: com.university.marketplace.di.AppContainer) {
     val isOnline by connectivityMonitor.isOnline.collectAsState(initial = connectivityMonitor.isCurrentlyOnline())
     val authRepository = remember { AuthRepositoryFactory.create(context.applicationContext) }
     val factory = remember(container, authRepository) { MarketplaceViewModelFactory(container, authRepository) }
+    val locationRepository = remember { AndroidLocationRepository(context.applicationContext) }
+
     val coroutineScope = rememberCoroutineScope()
     val startDestination = if (authRepository.hasActiveSession()) "home" else "sign_in"
     
@@ -110,7 +113,7 @@ fun AppNavigation(container: com.university.marketplace.di.AppContainer) {
     NavHost(navController = navController, startDestination = startDestination) {
         composable("sign_in") {
             val authViewModel = viewModel<AuthViewModel>(
-                factory = AuthViewModelFactory(authRepository)
+                factory = AuthViewModelFactory(authRepository, locationRepository)
             )
             SignInScreen(
                 isOnline = isOnline,
@@ -128,7 +131,7 @@ fun AppNavigation(container: com.university.marketplace.di.AppContainer) {
         }
         composable("sign_up") {
             val authViewModel = viewModel<AuthViewModel>(
-                factory = AuthViewModelFactory(authRepository)
+                factory = AuthViewModelFactory(authRepository, locationRepository)
             )
             SignUpScreen(
                 isOnline = isOnline,
