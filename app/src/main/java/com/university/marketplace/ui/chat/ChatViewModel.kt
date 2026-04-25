@@ -15,7 +15,10 @@ import kotlinx.coroutines.launch
 
 sealed interface ChatUiState {
     data object Loading : ChatUiState
-    data class Success(val messages: List<ChatMessage>) : ChatUiState
+    data class Success(
+        val messages: List<ChatMessage>,
+        val wsConnected: Boolean = true
+    ) : ChatUiState
     data class Error(val message: String) : ChatUiState
 }
 
@@ -31,48 +34,52 @@ class ChatViewModel(
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
 
     init {
-        loadHistory()
-        connectWebSocket()
-    }
-
-    private fun loadHistory() {
+        // Connect immediately so in-flight messages buffer in Channel.UNLIMITED
+        // while history is loading, then collect them after history is set.
+        wsClient.connect(conversationId, token)
         viewModelScope.launch {
-            try {
-                val messages = chatRepository.getMessages(conversationId)
-                _uiState.value = ChatUiState.Success(messages)
-            } catch (e: Exception) {
-                _uiState.value = ChatUiState.Error(
-                    e.toUserFriendlyMessage(fallback = "Failed to load messages")
-                )
-            }
+            loadHistory()
+            collectWsEvents()
         }
     }
 
-    private fun connectWebSocket() {
-        wsClient.connect(conversationId, token)
-        viewModelScope.launch {
-            wsClient.events.collect { event ->
-                when (event) {
-                    is WsEvent.MessageReceived -> {
-                        val incoming = event.message
-                        val newMsg = ChatMessage(
-                            id = incoming.id,
-                            conversationId = incoming.conversationId,
-                            senderId = incoming.senderId,
-                            body = incoming.body,
-                            sentAt = incoming.sentAt
-                        )
-                        _uiState.update { state ->
-                            when (state) {
-                                is ChatUiState.Success ->
-                                    state.copy(messages = state.messages + newMsg)
-                                else -> ChatUiState.Success(listOf(newMsg))
-                            }
+    private suspend fun loadHistory() {
+        try {
+            val messages = chatRepository.getMessages(conversationId)
+            _uiState.value = ChatUiState.Success(messages)
+        } catch (e: Exception) {
+            _uiState.value = ChatUiState.Error(
+                e.toUserFriendlyMessage(fallback = "Failed to load messages")
+            )
+        }
+    }
+
+    private suspend fun collectWsEvents() {
+        wsClient.events.collect { event ->
+            when (event) {
+                is WsEvent.MessageReceived -> {
+                    val incoming = event.message
+                    val newMsg = ChatMessage(
+                        id = incoming.id,
+                        conversationId = incoming.conversationId,
+                        senderId = incoming.senderId,
+                        body = incoming.body,
+                        sentAt = incoming.sentAt
+                    )
+                    _uiState.update { state ->
+                        if (state is ChatUiState.Success) {
+                            // Deduplicate: message may appear in both history and buffered WS events
+                            if (state.messages.any { it.id == newMsg.id }) state
+                            else state.copy(messages = state.messages + newMsg)
+                        } else {
+                            ChatUiState.Success(listOf(newMsg))
                         }
                     }
-                    is WsEvent.Error -> {}
-                    is WsEvent.Closed -> {}
                 }
+                is WsEvent.Error, is WsEvent.Closed ->
+                    _uiState.update { s ->
+                        if (s is ChatUiState.Success) s.copy(wsConnected = false) else s
+                    }
             }
         }
     }

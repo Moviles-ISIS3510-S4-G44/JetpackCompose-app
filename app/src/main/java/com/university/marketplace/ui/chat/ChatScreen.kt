@@ -3,6 +3,7 @@ package com.university.marketplace.ui.chat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -39,12 +40,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.university.marketplace.domain.ChatMessage
 import com.university.marketplace.ui.theme.MarketplaceBackground
 import com.university.marketplace.ui.theme.MarketplaceDark
 import com.university.marketplace.ui.theme.MarketplaceWhite
 import com.university.marketplace.ui.theme.MarketplaceYellow
+import java.time.OffsetDateTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -115,39 +121,54 @@ fun ChatScreen(
             }
         }
     ) { padding ->
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
                 .background(MarketplaceBackground)
         ) {
-            when (val state = uiState) {
-                is ChatUiState.Loading ->
-                    CircularProgressIndicator(
-                        modifier = Modifier.align(Alignment.Center),
-                        color = MarketplaceYellow
-                    )
-                is ChatUiState.Error ->
-                    Text(
-                        state.message,
-                        color = Color.Red,
-                        modifier = Modifier
-                            .align(Alignment.Center)
-                            .padding(16.dp)
-                    )
-                is ChatUiState.Success ->
-                    LazyColumn(
-                        state = listState,
-                        contentPadding = PaddingValues(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        items(state.messages, key = { it.id }) { message ->
-                            MessageBubble(
-                                message = message,
-                                isOwn = message.senderId == viewModel.currentUserId
-                            )
+            val state = uiState
+            if (state is ChatUiState.Success && !state.wsConnected) {
+                Text(
+                    text = "Connection lost — new messages may not arrive",
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color(0xFFFFF3CD))
+                        .padding(horizontal = 16.dp, vertical = 6.dp),
+                    fontSize = 12.sp,
+                    color = Color(0xFF856404),
+                    textAlign = TextAlign.Center
+                )
+            }
+            Box(modifier = Modifier.fillMaxSize()) {
+                when (val s = uiState) {
+                    is ChatUiState.Loading ->
+                        CircularProgressIndicator(
+                            modifier = Modifier.align(Alignment.Center),
+                            color = MarketplaceYellow
+                        )
+                    is ChatUiState.Error ->
+                        Text(
+                            s.message,
+                            color = Color.Red,
+                            modifier = Modifier
+                                .align(Alignment.Center)
+                                .padding(16.dp)
+                        )
+                    is ChatUiState.Success ->
+                        LazyColumn(
+                            state = listState,
+                            contentPadding = PaddingValues(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            items(s.messages, key = { it.id }) { message ->
+                                MessageBubble(
+                                    message = message,
+                                    isOwn = message.senderId == viewModel.currentUserId
+                                )
+                            }
                         }
-                    }
+                }
             }
         }
     }
@@ -169,11 +190,22 @@ private fun MessageBubble(message: ChatMessage, isOwn: Boolean) {
             color = if (isOwn) MarketplaceYellow else MarketplaceWhite,
             modifier = Modifier.widthIn(max = 280.dp)
         ) {
-            Text(
-                text = message.body,
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                color = MarketplaceDark
-            )
+            Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+                Text(text = message.body, color = MarketplaceDark)
+                Text(
+                    text = formatMessageTime(message.sentAt),
+                    fontSize = 10.sp,
+                    color = if (isOwn) MarketplaceDark.copy(alpha = 0.5f) else Color.Gray,
+                    modifier = Modifier.align(if (isOwn) Alignment.End else Alignment.Start)
+                )
+            }
         }
     }
 }
+
+private fun formatMessageTime(isoDateTime: String): String =
+    runCatching {
+        OffsetDateTime.parse(isoDateTime)
+            .atZoneSameInstant(ZoneId.systemDefault())
+            .format(DateTimeFormatter.ofPattern("HH:mm"))
+    }.getOrDefault("")
