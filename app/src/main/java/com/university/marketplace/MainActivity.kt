@@ -40,7 +40,12 @@ import com.university.marketplace.ui.home.CreateListingViewModel
 import com.university.marketplace.ui.home.HomeViewModel
 import com.university.marketplace.ui.home.ListingDetailViewModel
 import com.university.marketplace.ui.home.ProductDetailScreen
+import com.university.marketplace.ui.profile.MyListingsViewModel
 import com.university.marketplace.ui.profile.ProfileRoute
+import com.university.marketplace.ui.purchases.PurchaseHistoryScreen
+import com.university.marketplace.ui.purchases.PurchaseHistoryViewModel
+import com.university.marketplace.ui.purchases.SalesHistoryScreen
+import com.university.marketplace.ui.purchases.SalesHistoryViewModel
 import com.university.marketplace.ui.theme.JetpackComposeAppTheme
 
 class MainActivity : ComponentActivity() {
@@ -160,10 +165,14 @@ fun AppNavigation(container: com.university.marketplace.di.AppContainer) {
                     // Allowed even offline (Eventual connectivity)
                     navController.navigate("create_listing")
                 },
+                onNavigateToPurchases = {
+                    navController.navigate("purchase_history")
+                },
                 isOnline = isOnline
             )
         }
         composable("profile") {
+            val myListingsViewModel: MyListingsViewModel = viewModel(factory = factory)
             ProfileRoute(
                 authRepository = authRepository,
                 isOnline = isOnline,
@@ -174,7 +183,10 @@ fun AppNavigation(container: com.university.marketplace.di.AppContainer) {
                     navController.navigate("create_listing")
                 },
                 onLogout = onLogout,
-                onUnauthorized = onUnauthorized
+                onUnauthorized = onUnauthorized,
+                myListingsViewModel = myListingsViewModel,
+                onNavigateToDetail = { id -> navController.navigate("product_detail/$id") },
+                onNavigateToSales = { navController.navigate("sales_history") }
             )
         }
         composable(
@@ -219,6 +231,22 @@ fun AppNavigation(container: com.university.marketplace.di.AppContainer) {
                     viewModel = detailViewModel
                 )
             }
+        }
+        composable("purchase_history") {
+            val purchaseHistoryViewModel: PurchaseHistoryViewModel = viewModel(factory = factory)
+            PurchaseHistoryScreen(
+                isOnline = isOnline,
+                onBack = { navController.popBackStack() },
+                viewModel = purchaseHistoryViewModel
+            )
+        }
+        composable("sales_history") {
+            val salesHistoryViewModel: SalesHistoryViewModel = viewModel(factory = factory)
+            SalesHistoryScreen(
+                isOnline = isOnline,
+                onBack = { navController.popBackStack() },
+                viewModel = salesHistoryViewModel
+            )
         }
     }
 }

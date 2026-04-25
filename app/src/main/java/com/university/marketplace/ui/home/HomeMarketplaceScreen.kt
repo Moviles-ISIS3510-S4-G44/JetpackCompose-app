@@ -82,6 +82,7 @@ fun HomeMarketplaceScreen(
     onNavigateToProfile: () -> Unit,
     onNavigateToDetail: (String) -> Unit,
     onNavigateToSell: () -> Unit,
+    onNavigateToPurchases: () -> Unit = {},
     isOnline: Boolean,
     viewModel: HomeViewModel
 ) {
@@ -104,14 +105,13 @@ fun HomeMarketplaceScreen(
 
     Scaffold(
         bottomBar = {
-            if (!isLandscape) {
-                MarketplaceBottomNavigation(
-                    currentRoute = "home",
-                    onNavigate = { route ->
-                        when (route) {
-                            "profile" -> onNavigateToProfile()
-                            "create_listing" -> onNavigateToSell()
-                        }
+            MarketplaceBottomNavigation(
+                currentRoute = "home",
+                onNavigate = { route ->
+                    when (route) {
+                        "profile" -> onNavigateToProfile()
+                        "create_listing" -> onNavigateToSell()
+                        "purchase_history" -> onNavigateToPurchases()
                     }
                 )
             }
@@ -513,11 +513,11 @@ fun MarketplaceBottomNavigation(
         tonalElevation = 8.dp
     ) {
         val items = listOf(
-            BottomNavItem("Inicio", Icons.Filled.Home, Icons.Outlined.Home, route = "home"),
-            BottomNavItem("Vender", Icons.Filled.Add, Icons.Outlined.Add, route = "create_listing"),
-            BottomNavItem("Carrito", Icons.Filled.Add, Icons.Outlined.Add, route = "home"),
-            BottomNavItem("Mensajes", Icons.Filled.ChatBubble, Icons.Outlined.ChatBubbleOutline, route = "home"),
-            BottomNavItem("Perfil", Icons.Filled.Person, Icons.Outlined.PersonOutline, route = "profile")
+            BottomNavItem("Home", Icons.Filled.Home, Icons.Outlined.Home, route = "home"),
+            BottomNavItem("Purchases", Icons.Filled.Search, Icons.Outlined.Search, route = "purchase_history"),
+            BottomNavItem("Sell", Icons.Filled.Add, Icons.Outlined.Add, route = "create_listing"),
+            BottomNavItem("Messages", Icons.Filled.ChatBubble, Icons.Outlined.ChatBubbleOutline, route = "home"),
+            BottomNavItem("Profile", Icons.Filled.Person, Icons.Outlined.PersonOutline, route = "profile")
         )
 
         items.forEach { item ->

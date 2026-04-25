@@ -1,6 +1,7 @@
 package com.university.marketplace.ui.profile
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,6 +13,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -25,10 +28,12 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.listSaver
@@ -37,9 +42,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.university.marketplace.data.auth.AuthException
 import com.university.marketplace.data.auth.AuthRepository
 import com.university.marketplace.data.auth.UnauthorizedAuthException
@@ -47,7 +56,7 @@ import com.university.marketplace.domain.AuthenticatedUser
 import com.university.marketplace.ui.common.OfflineBanner
 import com.university.marketplace.ui.common.isWideScreen
 import com.university.marketplace.ui.common.rememberOfflineBannerController
-import com.university.marketplace.ui.common.toUserFriendlyMessage
+import com.university.marketplace.ui.home.ListingUiModel
 import com.university.marketplace.ui.home.MarketplaceBottomNavigation
 import com.university.marketplace.ui.theme.MarketplaceBackground
 import com.university.marketplace.ui.theme.MarketplaceDark
@@ -79,7 +88,10 @@ fun ProfileRoute(
     onNavigateHome: () -> Unit,
     onNavigateSell: () -> Unit,
     onLogout: () -> Unit,
-    onUnauthorized: () -> Unit
+    onUnauthorized: () -> Unit,
+    myListingsViewModel: MyListingsViewModel? = null,
+    onNavigateToDetail: ((String) -> Unit)? = null,
+    onNavigateToSales: (() -> Unit)? = null
 ) {
     var user by rememberSaveable(stateSaver = AuthenticatedUserSaver) {
         mutableStateOf<AuthenticatedUser?>(null)
@@ -117,6 +129,13 @@ fun ProfileRoute(
         }
     }
 
+    val myListingsUiState by (myListingsViewModel?.uiState?.collectAsState()
+        ?: androidx.compose.runtime.remember { mutableStateOf(MyListingsUiState.Empty) })
+
+    LaunchedEffect(isOnline) {
+        if (isOnline) myListingsViewModel?.load()
+    }
+
     ProfileScreen(
         isOnline = isOnline,
         user = user,
@@ -124,7 +143,10 @@ fun ProfileRoute(
         errorMessage = errorMessage,
         onNavigateHome = onNavigateHome,
         onNavigateSell = onNavigateSell,
-        onLogout = onLogout
+        onLogout = onLogout,
+        myListingsUiState = myListingsUiState,
+        onNavigateToDetail = onNavigateToDetail,
+        onNavigateToSales = onNavigateToSales
     )
 }
 
@@ -136,7 +158,10 @@ private fun ProfileScreen(
     errorMessage: String?,
     onNavigateHome: () -> Unit,
     onNavigateSell: () -> Unit,
-    onLogout: () -> Unit
+    onLogout: () -> Unit,
+    myListingsUiState: MyListingsUiState = MyListingsUiState.Empty,
+    onNavigateToDetail: ((String) -> Unit)? = null,
+    onNavigateToSales: (() -> Unit)? = null
 ) {
     var showLogoutDialog by rememberSaveable { mutableStateOf(false) }
     val offlineBannerController = rememberOfflineBannerController(isOnline)
@@ -228,7 +253,10 @@ private fun ProfileScreen(
                     user != null -> {
                         ProfileContent(
                             user = user,
-                            onLogoutRequested = { showLogoutDialog = true }
+                            onLogoutRequested = { showLogoutDialog = true },
+                            myListingsUiState = myListingsUiState,
+                            onNavigateToDetail = onNavigateToDetail,
+                            onNavigateToSales = onNavigateToSales
                         )
                     }
                 }
@@ -240,7 +268,10 @@ private fun ProfileScreen(
 @Composable
 private fun ProfileContent(
     user: AuthenticatedUser,
-    onLogoutRequested: () -> Unit
+    onLogoutRequested: () -> Unit,
+    myListingsUiState: MyListingsUiState = MyListingsUiState.Empty,
+    onNavigateToDetail: ((String) -> Unit)? = null,
+    onNavigateToSales: (() -> Unit)? = null
 ) {
     val wide = isWideScreen()
     Box(
@@ -286,6 +317,25 @@ private fun ProfileContent(
                     onLogoutRequested = onLogoutRequested,
                     modifier = Modifier.fillMaxWidth()
                 )
+            }
+
+            MyListingsSection(
+                uiState = myListingsUiState,
+                onNavigateToDetail = onNavigateToDetail
+            )
+
+            if (onNavigateToSales != null) {
+                Button(
+                    onClick = onNavigateToSales,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MarketplaceYellow,
+                        contentColor = MarketplaceDark
+                    ),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Text("My Sales", fontWeight = FontWeight.Bold)
+                }
             }
         }
     }
@@ -408,5 +458,106 @@ private fun ProfileInfoRow(
             fontFamily = if (monospaceValue) FontFamily.Monospace else FontFamily.Default,
             color = MarketplaceDark
         )
+    }
+}
+
+@Composable
+private fun MyListingsSection(
+    uiState: MyListingsUiState,
+    onNavigateToDetail: ((String) -> Unit)?
+) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MarketplaceWhite),
+        shape = RoundedCornerShape(20.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(20.dp)) {
+            Text(
+                text = "My Listings",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MarketplaceDark
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            when (uiState) {
+                is MyListingsUiState.Loading -> {
+                    CircularProgressIndicator(
+                        modifier = Modifier.align(Alignment.CenterHorizontally).padding(16.dp),
+                        color = MarketplaceDark
+                    )
+                }
+                is MyListingsUiState.Empty -> {
+                    Text(
+                        text = "You have no listings yet.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MarketplaceDark.copy(alpha = 0.6f)
+                    )
+                }
+                is MyListingsUiState.Error -> {
+                    Text(
+                        text = uiState.message,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.Red
+                    )
+                }
+                is MyListingsUiState.Success -> {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        uiState.listings.forEach { listing ->
+                            MyListingRow(
+                                listing = listing,
+                                onClick = { onNavigateToDetail?.invoke(listing.id) }
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MyListingRow(listing: ListingUiModel, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        AsyncImage(
+            model = listing.imageUrl,
+            contentDescription = listing.name,
+            modifier = Modifier
+                .size(56.dp)
+                .clip(RoundedCornerShape(8.dp)),
+            contentScale = ContentScale.Crop
+        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = listing.name,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                style = MaterialTheme.typography.bodyMedium
+            )
+            Text(
+                text = "$${listing.price.toInt()}",
+                color = MarketplaceYellow,
+                fontWeight = FontWeight.Bold,
+                fontSize = 13.sp
+            )
+        }
+        Surface(
+            color = Color(0xFFF1F1F1),
+            shape = RoundedCornerShape(6.dp)
+        ) {
+            Text(
+                text = listing.condition.uppercase(),
+                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+                color = MarketplaceDark
+            )
+        }
     }
 }

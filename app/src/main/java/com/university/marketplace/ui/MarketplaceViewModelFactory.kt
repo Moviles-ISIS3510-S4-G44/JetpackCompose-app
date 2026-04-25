@@ -9,6 +9,8 @@ import com.university.marketplace.ui.home.CreateListingViewModel
 import com.university.marketplace.ui.home.HomeViewModel
 import com.university.marketplace.ui.home.ListingDetailViewModel
 import com.university.marketplace.ui.profile.MyListingsViewModel
+import com.university.marketplace.ui.purchases.PurchaseHistoryViewModel
+import com.university.marketplace.ui.purchases.SalesHistoryViewModel
 
 class MarketplaceViewModelFactory(
     private val container: AppContainer,
@@ -29,7 +31,8 @@ class MarketplaceViewModelFactory(
             modelClass.isAssignableFrom(ListingDetailViewModel::class.java) -> {
                 ListingDetailViewModel(
                     getListingByIdUseCase = container.getListingByIdUseCase,
-                    interactionsRepository = container.interactionsRepository
+                    interactionsRepository = container.interactionsRepository,
+                    createPurchaseUseCase = container.createPurchaseUseCase
                 ) as T
             }
             modelClass.isAssignableFrom(MapViewModel::class.java) -> {
@@ -45,6 +48,17 @@ class MarketplaceViewModelFactory(
             modelClass.isAssignableFrom(MyListingsViewModel::class.java) -> {
                 MyListingsViewModel(
                     getMyListingsUseCase = container.getMyListingsUseCase
+                ) as T
+            }
+            modelClass.isAssignableFrom(PurchaseHistoryViewModel::class.java) -> {
+                PurchaseHistoryViewModel(
+                    getMyPurchasesUseCase = container.getMyPurchasesUseCase,
+                    rateSellerUseCase = container.rateSellerUseCase
+                ) as T
+            }
+            modelClass.isAssignableFrom(SalesHistoryViewModel::class.java) -> {
+                SalesHistoryViewModel(
+                    getSalesHistoryUseCase = container.getSalesHistoryUseCase
                 ) as T
             }
             else -> throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
