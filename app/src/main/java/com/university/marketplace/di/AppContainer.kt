@@ -25,6 +25,7 @@ interface AppContainer {
     val categoryRepository: CategoryRepository
     val purchaseRepository: PurchaseRepository
     val interactionsRepository: InteractionsRepository
+    val locationRepository: LocationRepository
     val getActiveListingsUseCase: GetActiveListingsUseCase
     val getListingByIdUseCase: GetListingByIdUseCase
     val searchListingsByRelevanceUseCase: SearchListingsByRelevanceUseCase
@@ -36,9 +37,27 @@ interface AppContainer {
     val rateSellerUseCase: RateSellerUseCase
 }
 
-class DefaultAppContainer : AppContainer {
+class DefaultAppContainer(context: Context) : AppContainer {
+    
+    private val database: AppDatabase by lazy {
+        AppDatabase.getDatabase(context)
+    }
+
+    private val semanticSearchEngine: SemanticSearchEngine by lazy {
+        SemanticSearchEngine(context)
+    }
+
+    override val locationRepository: LocationRepository by lazy {
+        AndroidLocationRepository(context)
+    }
+
     override val listingRepository: ListingRepository by lazy {
-        ListingsRepository(api = NetworkModule.listingsApi)
+        ListingsRepository(
+            api = NetworkModule.listingsApi,
+            groqApi = NetworkModule.groqApi,
+            dao = database.listingDao(),
+            semanticSearchEngine = semanticSearchEngine
+        )
     }
 
     override val categoryRepository: CategoryRepository by lazy {
@@ -58,7 +77,7 @@ class DefaultAppContainer : AppContainer {
     }
 
     override val searchListingsByRelevanceUseCase: SearchListingsByRelevanceUseCase by lazy {
-        SearchListingsByRelevanceUseCase()
+        SearchListingsByRelevanceUseCase(listingRepository)
     }
 
     override val getFilteredListingsUseCase: GetFilteredListingsUseCase by lazy {

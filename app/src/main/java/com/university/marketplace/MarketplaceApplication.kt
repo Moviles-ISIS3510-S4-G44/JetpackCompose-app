@@ -12,6 +12,6 @@ class MarketplaceApplication : Application() {
         super.onCreate()
         NetworkModule.initialize(this)
         NetworkModule.authSessionStorage.clearIfNotRemembered()
-        container = DefaultAppContainer()
+        container = DefaultAppContainer(this)
     }
 }
