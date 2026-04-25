@@ -103,6 +103,26 @@ fun MapViewScreen(
         mutableStateOf<LatLng?>(null)
     }
 
+    val updateUserLocation: () -> Unit = {
+        if (
+            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        ) {
+            fusedLocationClient.lastLocation
+                .addOnSuccessListener { loc ->
+                    if (loc != null) {
+                        userLocation = LatLng(loc.latitude, loc.longitude)
+                    }
+                }
+        }
+    }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) {
+        updateUserLocation()
+    }
+
     LaunchedEffect(productId, isOnline) {
         val currentState = uiState
         if (currentState is MapUiState.Success) return@LaunchedEffect

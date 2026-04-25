@@ -1,10 +1,5 @@
 package com.university.marketplace.ui.home
 
-import android.Manifest
-import android.content.res.Configuration
-import android.content.pm.PackageManager
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -19,11 +14,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.GridItemSpan
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -40,7 +32,6 @@ import androidx.compose.material.icons.outlined.PersonOutline
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
@@ -65,18 +56,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.content.ContextCompat
 import coil.compose.AsyncImage
+import com.university.marketplace.domain.Category
 import com.university.marketplace.ui.theme.MarketplaceDark
 import com.university.marketplace.ui.theme.MarketplaceWhite
 import com.university.marketplace.ui.theme.MarketplaceYellow
 import java.util.Locale
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeMarketplaceScreen(
     onNavigateToProfile: () -> Unit,
@@ -87,33 +75,32 @@ fun HomeMarketplaceScreen(
     isOnline: Boolean,
     viewModel: HomeViewModel
 ) {
-    val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
     val categories by viewModel.categories.collectAsState()
     val selectedCategoryId by viewModel.selectedCategoryId.collectAsState()
+    val isLandscape = LocalConfiguration.current.screenWidthDp > LocalConfiguration.current.screenHeightDp
 
     LaunchedEffect(isOnline) {
-        val currentState = uiState
         if (isOnline) {
-            if (currentState is HomeUiState.Loading || currentState is HomeUiState.Error) {
-                viewModel.loadListings()
-            }
-        } else if (currentState !is HomeUiState.Success) {
+            viewModel.loadListings()
+        } else {
             viewModel.showOfflineState()
         }
     }
 
     Scaffold(
         bottomBar = {
-            MarketplaceBottomNavigation(
-                currentRoute = "home",
-                onNavigate = { route ->
-                    when (route) {
-                        "profile" -> onNavigateToProfile()
-                        "create_listing" -> onNavigateToSell()
-                        "purchase_history" -> onNavigateToPurchases()
-                        "conversations" -> onNavigateToMessages()
+            if (!isLandscape) {
+                MarketplaceBottomNavigation(
+                    currentRoute = "home",
+                    onNavigate = { route ->
+                        when (route) {
+                            "profile" -> onNavigateToProfile()
+                            "create_listing" -> onNavigateToSell()
+                            "purchase_history" -> onNavigateToPurchases()
+                            "conversations" -> onNavigateToMessages()
+                        }
                     }
                 )
             }
@@ -125,114 +112,14 @@ fun HomeMarketplaceScreen(
                 .fillMaxSize()
                 .background(Color.White)
         ) {
-            // Header with Search and Categories (Compact in Landscape)
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(MarketplaceYellow)
-                    .padding(top = if (isLandscape) 4.dp else 8.dp)
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    TextField(
-                        value = searchQuery,
-                        onValueChange = {
-                            if (isOnline) {
-                                viewModel.onSearchQueryChanged(it)
-                            }
-                        },
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(if (isLandscape) 44.dp else 52.dp)
-                            .clip(RoundedCornerShape(26.dp)),
-                        placeholder = {
-                            Text(
-                                if (isOnline) "Buscar productos..." else "Sin conexión",
-                                color = Color.Gray,
-                                fontSize = 14.sp
-                            )
-                        },
-                        leadingIcon = {
-                            Icon(
-                                Icons.Default.Search,
-                                contentDescription = null,
-                                tint = Color.Gray,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        },
-                        colors = TextFieldDefaults.colors(
-                            focusedContainerColor = MarketplaceWhite,
-                            unfocusedContainerColor = MarketplaceWhite,
-                            disabledContainerColor = MarketplaceWhite,
-                            focusedIndicatorColor = Color.Transparent,
-                            unfocusedIndicatorColor = Color.Transparent
-                        ),
-                        singleLine = true,
-                        enabled = isOnline
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    IconButton(
-                        onClick = { /* TODO */ },
-                        modifier = Modifier.size(if (isLandscape) 32.dp else 48.dp)
-                    ) {
-                        Icon(Icons.Default.Notifications, contentDescription = "Notificaciones", tint = MarketplaceDark)
-                    }
-                }
-
-                if (!isLandscape) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    LazyRow(
-                        contentPadding = PaddingValues(horizontal = 16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(24.dp),
-                        modifier = Modifier.padding(bottom = 8.dp)
-                    ) {
-                        items(categories) { category ->
-                            CategoryItem(
-                                category = category,
-                                isSelected = category == selectedCategory,
-                                onClick = { viewModel.onCategoryFilterSelected(category) }
-                            )
-                        }
-                    }
-
-                    LazyRow(
-                        contentPadding = PaddingValues(horizontal = 16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.padding(bottom = 8.dp)
-                    ) {
-                        items(conditions) { condition ->
-                            FilterChip(
-                                selected = selectedCondition == condition,
-                                onClick = { viewModel.onConditionFilterSelected(condition) },
-                                label = { Text(condition) },
-                                colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = MarketplaceWhite,
-                                    containerColor = Color.White.copy(alpha = 0.65f)
-                                )
-                            )
-                        }
-                    }
-
-                // Categories
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(categories) { category ->
-                        val isSelected = selectedCategoryId == category.id
-                        SuggestionChip(
-                            onClick = { if (isOnline) viewModel.onCategorySelected(category.id) },
-                            label = { Text(category.name) },
-                            shape = RoundedCornerShape(20.dp),
-                            colors = SuggestionChipDefaults.suggestionChipColors(
-                                containerColor = if (isSelected) MarketplaceYellow else MarketplaceWhite
-                            ),
-                            border = null
-                        )
-                    }
-                }
-            }
+            SearchHeader(
+                searchQuery = searchQuery,
+                isOnline = isOnline,
+                categories = categories,
+                selectedCategoryId = selectedCategoryId,
+                onQueryChanged = viewModel::onSearchQueryChanged,
+                onCategorySelected = viewModel::onCategorySelected
+            )
 
             when (val state = uiState) {
                 is HomeUiState.Loading -> {
@@ -246,70 +133,50 @@ fun HomeMarketplaceScreen(
                     }
                 }
                 is HomeUiState.Success -> {
-                    LazyVerticalGrid(
-                        columns = GridCells.Adaptive(minSize = 160.dp),
+                    val onListingClick: (ListingUiModel) -> Unit = { listing ->
+                        viewModel.onListingOpened(listing)
+                        onNavigateToDetail(listing.id)
+                    }
+
+                    LazyColumn(
                         modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                        contentPadding = PaddingValues(bottom = 16.dp)
                     ) {
-                        if (state.featured.isNotEmpty()) {
-                            item(span = { GridItemSpan(maxLineSpan) }) {
-                                SectionHeader(
-                                    title = if (state.isSearching) "Search Results" else "Featured",
-                                    onSeeAllClick = {}
-                                )
+                        if (state.isSearching) {
+                            item { SectionTitle("Resultados") }
+                            val results = state.featured + state.recent
+                            if (results.isEmpty()) {
+                                item {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(24.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text("No se encontraron productos", color = Color.Gray)
+                                    }
+                                }
+                            } else {
+                                items(results, key = { it.id }) { listing ->
+                                    SearchResultCard(listing = listing, onClick = { onListingClick(listing) })
+                                }
                             }
-                            item(span = { GridItemSpan(maxLineSpan) }) {
+                        } else {
+                            item {
+                                SectionTitle("Destacados")
                                 LazyRow(
+                                    contentPadding = PaddingValues(horizontal = 16.dp),
                                     horizontalArrangement = Arrangement.spacedBy(16.dp)
                                 ) {
-                                    items(
-                                        items = state.featured,
-                                        key = { it.id }
-                                    ) { listing ->
-                                        FeaturedProductCard(
-                                            listing = listing,
-                                            onClick = { onNavigateToDetail(listing.id) }
-                                        )
+                                    items(state.featured, key = { it.id }) { listing ->
+                                        FeaturedProductCard(listing = listing, onClick = { onListingClick(listing) })
                                     }
                                 }
                             }
-
-                        if (state.recent.isNotEmpty()) {
-                            item(span = { GridItemSpan(maxLineSpan) }) {
-                                SectionHeader(
-                                    title = if (state.isSearching) "" else "Recent Listings",
-                                    onSeeAllClick = {}
-                                )
+                            item { SectionTitle("Publicaciones recientes") }
+                            items(state.recent, key = { it.id }) { listing ->
+                                SearchResultCard(listing = listing, onClick = { onListingClick(listing) })
                             }
-
-                            items(
-                                items = state.recent,
-                                key = { it.id }
-                            ) { listing ->
-                                RecentProductCard(
-                                    listing = listing,
-                                    onClick = { onNavigateToDetail(listing.id) }
-                                )
-                            }
-                        }
-
-                        if (state.featured.isEmpty() && state.recent.isEmpty()) {
-                            item(span = { GridItemSpan(maxLineSpan) }) {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(32.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text("No items found")
-                                }
-                            }
-                        }
-
-                        item(span = { GridItemSpan(maxLineSpan) }) {
-                            Spacer(modifier = Modifier.height(16.dp))
                         }
                     }
                 }
@@ -319,29 +186,91 @@ fun HomeMarketplaceScreen(
 }
 
 @Composable
-fun SectionHeader(title: String, onSeeAllClick: () -> Unit) {
-    if (title.isEmpty()) return
-    Row(
+private fun SearchHeader(
+    searchQuery: String,
+    isOnline: Boolean,
+    categories: List<Category>,
+    selectedCategoryId: String?,
+    onQueryChanged: (String) -> Unit,
+    onCategorySelected: (String?) -> Unit
+) {
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 8.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+            .background(MarketplaceYellow)
+            .padding(top = 8.dp, bottom = 8.dp)
     ) {
-        Text(
-            text = category,
-            color = MarketplaceDark,
-            fontSize = 14.sp,
-            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-            modifier = Modifier.padding(vertical = 4.dp)
-        )
-        if (isSelected) {
-            Box(
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            TextField(
+                value = searchQuery,
+                onValueChange = { if (isOnline) onQueryChanged(it) },
                 modifier = Modifier
-                    .width(20.dp)
-                    .height(2.dp)
-                    .background(MarketplaceDark)
+                    .weight(1f)
+                    .height(52.dp)
+                    .clip(RoundedCornerShape(26.dp)),
+                placeholder = {
+                    Text(
+                        if (isOnline) "Buscar productos..." else "Sin conexión",
+                        color = Color.Gray,
+                        fontSize = 14.sp
+                    )
+                },
+                leadingIcon = {
+                    Icon(
+                        Icons.Default.Search,
+                        contentDescription = null,
+                        tint = Color.Gray,
+                        modifier = Modifier.size(20.dp)
+                    )
+                },
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = MarketplaceWhite,
+                    unfocusedContainerColor = MarketplaceWhite,
+                    disabledContainerColor = MarketplaceWhite,
+                    focusedIndicatorColor = Color.Transparent,
+                    unfocusedIndicatorColor = Color.Transparent
+                ),
+                singleLine = true,
+                enabled = isOnline
             )
+            Spacer(modifier = Modifier.width(8.dp))
+            IconButton(onClick = { }, modifier = Modifier.size(48.dp)) {
+                Icon(Icons.Default.Notifications, contentDescription = "Notificaciones", tint = MarketplaceDark)
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            item {
+                FilterChip(
+                    selected = selectedCategoryId == null,
+                    onClick = { onCategorySelected(null) },
+                    label = { Text("Todo") },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = MarketplaceWhite,
+                        containerColor = Color.White.copy(alpha = 0.65f)
+                    )
+                )
+            }
+            items(categories, key = { it.id }) { category ->
+                FilterChip(
+                    selected = selectedCategoryId == category.id,
+                    onClick = { onCategorySelected(category.id) },
+                    label = { Text(category.name) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = MarketplaceWhite,
+                        containerColor = Color.White.copy(alpha = 0.65f)
+                    )
+                )
+            }
         }
     }
 }
@@ -351,39 +280,8 @@ fun SectionTitle(title: String) {
     Text(
         text = title,
         style = MaterialTheme.typography.titleLarge,
-        fontWeight = FontWeight.Bold,
         modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp)
     )
-}
-
-@Composable
-fun ActivityProductCard(listing: ListingUiModel, onClick: () -> Unit) {
-    Column(modifier = Modifier.width(160.dp)) {
-        DistanceLabel(distance = listing.distance)
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable { onClick() },
-            shape = RoundedCornerShape(8.dp),
-            colors = CardDefaults.cardColors(containerColor = MarketplaceWhite),
-            elevation = CardDefaults.cardElevation(2.dp)
-        ) {
-            Column {
-                AsyncImage(
-                    model = listing.imageUrl,
-                    contentDescription = null,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(160.dp),
-                    contentScale = ContentScale.Crop
-                )
-                Column(modifier = Modifier.padding(8.dp)) {
-                    Text(text = listing.name, fontSize = 14.sp, maxLines = 2, minLines = 2)
-                    Text(text = "$ ${String.format(Locale.US, "%,.0f", listing.price).replace(',', '.')}", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                }
-            }
-        }
-    }
 }
 
 @Composable
@@ -410,7 +308,10 @@ fun FeaturedProductCard(listing: ListingUiModel, onClick: () -> Unit) {
                     )
                     Column(modifier = Modifier.padding(8.dp)) {
                         Text(text = listing.name, fontSize = 14.sp, maxLines = 2, minLines = 2)
-                        Text(text = "$ ${String.format(Locale.US, "%,.0f", listing.price).replace(',', '.')}", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        Text(
+                            text = "$ ${String.format(Locale.US, "%,.0f", listing.price).replace(',', '.')}",
+                            fontSize = 16.sp
+                        )
                     }
                 }
                 Surface(
@@ -421,37 +322,8 @@ fun FeaturedProductCard(listing: ListingUiModel, onClick: () -> Unit) {
                     Text(
                         text = "Destacado",
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold
+                        fontSize = 10.sp
                     )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun RecentProductCard(listing: ListingUiModel, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    Column(modifier = modifier) {
-        DistanceLabel(distance = listing.distance)
-        Card(
-            modifier = Modifier.clickable { onClick() },
-            shape = RoundedCornerShape(8.dp),
-            colors = CardDefaults.cardColors(containerColor = MarketplaceWhite),
-            elevation = CardDefaults.cardElevation(2.dp)
-        ) {
-            Column {
-                AsyncImage(
-                    model = listing.imageUrl,
-                    contentDescription = null,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(120.dp),
-                    contentScale = ContentScale.Crop
-                )
-                Column(modifier = Modifier.padding(8.dp)) {
-                    Text(text = listing.name, fontSize = 14.sp, maxLines = 1)
-                    Text(text = "$ ${String.format(Locale.US, "%,.0f", listing.price).replace(',', '.')}", fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -487,8 +359,11 @@ fun SearchResultCard(listing: ListingUiModel, onClick: () -> Unit) {
                 )
                 Spacer(modifier = Modifier.width(16.dp))
                 Column {
-                    Text(text = listing.name, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                    Text(text = "$ ${String.format(Locale.US, "%,.0f", listing.price).replace(',', '.')}", color = Color.Gray)
+                    Text(text = listing.name, fontSize = 16.sp)
+                    Text(
+                        text = "$ ${String.format(Locale.US, "%,.0f", listing.price).replace(',', '.')}",
+                        color = Color.Gray
+                    )
                 }
             }
         }
@@ -516,7 +391,7 @@ fun MarketplaceBottomNavigation(
     ) {
         val items = listOf(
             BottomNavItem("Home", Icons.Filled.Home, Icons.Outlined.Home, route = "home"),
-            BottomNavItem("Purchases", Icons.Filled.Search, Icons.Outlined.Search, route = "purchase_history"),
+            BottomNavItem("Purchases", Icons.Filled.Search, Icons.Filled.Search, route = "purchase_history"),
             BottomNavItem("Sell", Icons.Filled.Add, Icons.Outlined.Add, route = "create_listing"),
             BottomNavItem("Messages", Icons.Filled.ChatBubble, Icons.Outlined.ChatBubbleOutline, route = "conversations"),
             BottomNavItem("Profile", Icons.Filled.Person, Icons.Outlined.PersonOutline, route = "profile")
@@ -526,21 +401,12 @@ fun MarketplaceBottomNavigation(
             val selected = item.route == currentRoute
             NavigationBarItem(
                 icon = {
-                    if (item.title == "Carrito") {
-                        Box(
-                            modifier = Modifier
-                                .size(50.dp)
-                                .background(Color.White, RoundedCornerShape(25.dp))
-                                .padding(2.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(24.dp))
-                        }
-                    } else {
-                        Icon(if (selected) item.selectedIcon else item.unselectedIcon, contentDescription = item.title)
-                    }
+                    Icon(
+                        if (selected) item.selectedIcon else item.unselectedIcon,
+                        contentDescription = item.title
+                    )
                 },
-                label = { if (item.title != "Carrito") Text(item.title, fontSize = 10.sp) },
+                label = { Text(item.title, fontSize = 10.sp) },
                 selected = selected,
                 onClick = { onNavigate(item.route) },
                 colors = NavigationBarItemDefaults.colors(
@@ -559,17 +425,3 @@ data class BottomNavItem(
     val unselectedIcon: ImageVector,
     val route: String
 )
-
-private fun hasLocationPermission(context: android.content.Context): Boolean {
-    val hasFineLocation = ContextCompat.checkSelfPermission(
-        context,
-        Manifest.permission.ACCESS_FINE_LOCATION
-    ) == PackageManager.PERMISSION_GRANTED
-
-    val hasCoarseLocation = ContextCompat.checkSelfPermission(
-        context,
-        Manifest.permission.ACCESS_COARSE_LOCATION
-    ) == PackageManager.PERMISSION_GRANTED
-
-    return hasFineLocation || hasCoarseLocation
-}

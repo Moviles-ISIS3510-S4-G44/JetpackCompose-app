@@ -10,7 +10,7 @@ class GetFilteredListingsUseCase(private val repository: ListingRepository) {
         condition: String? = null,
         minPrice: Int? = null,
         maxPrice: Int? = null
-    ): List<Listing> = repository.searchListings(
+    ): List<Listing> = repository.searchListingsFiltered(
         q = q,
         categoryId = categoryId,
         condition = condition,

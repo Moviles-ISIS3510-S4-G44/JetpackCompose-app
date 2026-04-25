@@ -5,6 +5,7 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
+    id("com.google.devtools.ksp")
 }
 
 val secretsProperties = Properties()
@@ -19,6 +20,13 @@ val apiBaseUrl =
     (secretsProperties.getProperty("API_BASE_URL")
         ?: (project.findProperty("API_BASE_URL") as String?)
         ?: "https://uniandesmarketplacebackend.onrender.com/")
+        .trim()
+        .removeSurrounding("\"")
+
+val groqApiKey =
+    (secretsProperties.getProperty("GROQ_API_KEY")
+        ?: (project.findProperty("GROQ_API_KEY") as String?)
+        ?: "")
         .trim()
         .removeSurrounding("\"")
 
@@ -44,6 +52,7 @@ android {
                 ?: "YOUR_MAPS_API_KEY"
 
         buildConfigField("String", "API_BASE_URL", "\"$apiBaseUrl\"")
+        buildConfigField("String", "GROQ_API_KEY", "\"$groqApiKey\"")
     }
 
     buildTypes {
@@ -86,7 +95,6 @@ dependencies {
     implementation(composeBom)
     androidTestImplementation(composeBom)
 
-    implementation(platform("com.google.firebase:firebase-bom:32.7.0"))
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.6")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.6")
@@ -118,6 +126,11 @@ dependencies {
     implementation("com.google.android.gms:play-services-maps:19.0.0")
     implementation("com.google.android.gms:play-services-location:21.3.0")
 
+    val roomVersion = "2.6.1"
+    implementation("androidx.room:room-runtime:$roomVersion")
+    implementation("androidx.room:room-ktx:$roomVersion")
+    ksp("androidx.room:room-compiler:$roomVersion")
+
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.6.1")
@@ -126,9 +139,6 @@ dependencies {
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
 
-    implementation(platform("com.google.firebase:firebase-bom:34.12.0"))
-
-    implementation("com.google.firebase:firebase-analytics")
 }
 
 val testClasses by tasks.registering {

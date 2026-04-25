@@ -101,6 +101,16 @@ fun AppNavigation(container: com.university.marketplace.di.AppContainer) {
         }
     }
 
+    val navigateToTopLevel: (String) -> Unit = { route ->
+        navController.navigate(route) {
+            popUpTo(navController.graph.startDestinationId) {
+                saveState = true
+            }
+            launchSingleTop = true
+            restoreState = true
+        }
+    }
+
     var lastNotifiedOnline by rememberSaveable { mutableStateOf<Boolean?>(null) }
     LaunchedEffect(isOnline) {
         val previous = lastNotifiedOnline

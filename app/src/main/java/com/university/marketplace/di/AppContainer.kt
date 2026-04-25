@@ -1,5 +1,6 @@
 package com.university.marketplace.di
 
+import android.content.Context
 import com.university.marketplace.data.CategoriesRepository
 import com.university.marketplace.data.ChatRepositoryImpl
 import com.university.marketplace.data.DefaultInteractionsRepository
@@ -7,7 +8,8 @@ import com.university.marketplace.data.InteractionsRepository
 import com.university.marketplace.data.ListingsRepository
 import com.university.marketplace.data.PurchasesRepository
 import com.university.marketplace.data.api.NetworkModule
-import com.university.marketplace.data.auth.AuthRepository
+import com.university.marketplace.data.local.AppDatabase
+import com.university.marketplace.data.search.SemanticSearchEngine
 import com.university.marketplace.domain.CategoryRepository
 import com.university.marketplace.domain.ChatRepository
 import com.university.marketplace.domain.ListingRepository
@@ -40,17 +42,13 @@ interface AppContainer {
 }
 
 class DefaultAppContainer(context: Context) : AppContainer {
-    
+
     private val database: AppDatabase by lazy {
         AppDatabase.getDatabase(context)
     }
 
     private val semanticSearchEngine: SemanticSearchEngine by lazy {
         SemanticSearchEngine(context)
-    }
-
-    override val locationRepository: LocationRepository by lazy {
-        AndroidLocationRepository(context)
     }
 
     override val listingRepository: ListingRepository by lazy {

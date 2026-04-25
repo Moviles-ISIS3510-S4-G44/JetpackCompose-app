@@ -68,6 +68,27 @@ fun ProductDetailScreen(
     var userCoordinates by rememberSaveable(stateSaver = UserCoordinatesSaver) {
         mutableStateOf<Pair<Double, Double>?>(null)
     }
+
+    val updateLocation: () -> Unit = {
+        if (
+            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        ) {
+            fusedLocationClient.lastLocation
+                .addOnSuccessListener { location ->
+                    if (location != null) {
+                        userCoordinates = location.latitude to location.longitude
+                    }
+                }
+        }
+    }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) {
+        updateLocation()
+    }
+
     var showPurchaseDialog by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
 

@@ -9,6 +9,7 @@ import com.university.marketplace.BuildConfig
 import com.university.marketplace.data.auth.AuthApiService
 import com.university.marketplace.data.auth.AuthSessionStorage
 import com.university.marketplace.data.chat.ChatWebSocketClient
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
@@ -29,6 +30,7 @@ object NetworkModule {
     private lateinit var categoriesApiInternal: CategoriesApi
     private lateinit var purchasesApiInternal: PurchasesApi
     private lateinit var chatApiInternal: ChatApi
+    private lateinit var groqApiInternal: GroqApi
     private lateinit var authenticatedClientInternal: OkHttpClient
     private lateinit var wsBaseUrlInternal: String
 
@@ -52,6 +54,9 @@ object NetworkModule {
 
     val chatApi: ChatApi
         get() = synchronized(this) { chatApiInternal }
+
+    val groqApi: GroqApi
+        get() = synchronized(this) { groqApiInternal }
 
     fun createChatWebSocketClient(): ChatWebSocketClient =
         synchronized(this) {
@@ -131,6 +136,7 @@ object NetworkModule {
             categoriesApiInternal = authenticatedMoshiRetrofit.create(CategoriesApi::class.java)
             purchasesApiInternal = authenticatedMoshiRetrofit.create(PurchasesApi::class.java)
             chatApiInternal = authenticatedMoshiRetrofit.create(ChatApi::class.java)
+            groqApiInternal = groqRetrofit.create(GroqApi::class.java)
 
             initialized = true
         }

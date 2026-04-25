@@ -1,6 +1,10 @@
 package com.university.marketplace.data
 
+import com.university.marketplace.BuildConfig
 import com.university.marketplace.data.api.CreateListingDto
+import com.university.marketplace.data.api.GroqApi
+import com.university.marketplace.data.api.GroqMessage
+import com.university.marketplace.data.api.GroqRequest
 import com.university.marketplace.data.api.ListingsApi
 import com.university.marketplace.data.api.NetworkModule
 import com.university.marketplace.data.api.SearchIntent
@@ -32,48 +36,37 @@ class ListingsRepository(
     private val dao: ListingDao,
     private val semanticSearchEngine: SemanticSearchEngine
 ) : ListingRepository {
-    override suspend fun getActiveListings(): List<Listing> {
-        return api.getListings(status = "published").map { it.toDomain() }
+
+    private val moshi = Moshi.Builder().add(KotlinJsonAdapterFactory()).build()
+    private val listType = Types.newParameterizedType(List::class.java, String::class.java)
+    private val listAdapter = moshi.adapter<List<String>>(listType)
+
+    override fun getActiveListings(): Flow<List<Listing>> {
+        return dao.getActiveListings().map { entities ->
+            entities.map { it.toDomain() }
+        }
+    }
+
+    override suspend fun refreshListings() {
+        withContext(Dispatchers.IO) {
+            try {
+                val remoteListings = api.getListings(status = "published")
+                val entities = remoteListings.map { dto ->
+                    val domain = dto.toDomain()
+                    val embedding = semanticSearchEngine.getEmbedding("${domain.title} ${domain.description}")
+                    domain.toEntity(embedding)
+                }
+                dao.insertListings(entities)
+                dao.deleteStaleListings(System.currentTimeMillis() - 10 * 60 * 1000)
+                dao.deleteStaleSearchCache(System.currentTimeMillis() - 10 * 60 * 1000)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
     }
 
     override suspend fun getListingById(id: String): Listing {
         return dao.getListingById(id)?.toDomain() ?: api.getListingById(id).toDomain()
-    }
-
-    override suspend fun parseSearchIntent(query: String): SearchIntent? {
-        return withContext(Dispatchers.IO) {
-            try {
-                val prompt = """
-                    Extract search filters from the following query in JSON format. Use these fields:
-                    - product_name (string)
-                    - max_price (number)
-                    - category (string)
-                    - condition (string: "new" or "used")
-                    - proximity_preference (number in km)
-                    - sort_order (string: "relevance", "price_low", "price_high")
-                    
-                    Return ONLY the JSON object.
-                    Query: "$query"
-                """.trimIndent()
-
-                val response = groqApi.completeChat(
-                    apiKey = "Bearer ${BuildConfig.GROQ_API_KEY}",
-                    request = GroqRequest(
-                        messages = listOf(GroqMessage(role = "user", content = prompt))
-                    )
-                )
-                
-                val content = response.choices.firstOrNull()?.message?.content ?: return@withContext null
-                // Clean markdown if present
-                val json = content.substringAfter("```json").substringBefore("```").trim()
-                val finalJson = if (json.startsWith("{")) json else content
-                
-                moshi.adapter(SearchIntent::class.java).fromJson(finalJson)
-            } catch (e: Exception) {
-                e.printStackTrace()
-                null
-            }
-        }
     }
 
     override suspend fun searchListings(query: String): Flow<List<Listing>> = flow {
@@ -85,28 +78,25 @@ class ListingsRepository(
             return@flow
         }
 
-        // 1. Check Query Cache
         val cachedSearch = dao.getSearchCache(normalizedQuery)
         if (cachedSearch != null && (System.currentTimeMillis() - cachedSearch.timestamp) < 10 * 60 * 1000) {
             val resultIds = listAdapter.fromJson(cachedSearch.resultIdsJson) ?: emptyList()
             val listings = resultIds.mapNotNull { id -> dao.getListingById(id)?.toDomain() }
             if (listings.isNotEmpty()) {
                 emit(listings)
-                // Still fall through to refresh the ranking if needed, or return here for strict cache
-                // return@flow
             }
         }
 
-        // 2. Immediate emit from local listings if no query cache or to provide baseline
         val cachedEntities = dao.getActiveListingsList()
-        if (cachedSearch == null) emit(cachedEntities.map { it.toDomain() })
+        if (cachedSearch == null) {
+            emit(cachedEntities.map { it.toDomain() })
+        }
 
         val vocabulary = buildVocabulary(cachedEntities.map { it.toDomain() })
         val correctedTokens = initialQueryTokens.map { token -> autocorrectToken(token, vocabulary) }
         val expandedQueryTokens = SearchQueryExpander.expandTokens(correctedTokens)
         val semanticQuery = expandedQueryTokens.joinToString(" ")
 
-        // 3. Parallel execution of Intent Parsing and Semantic Search
         coroutineScope {
             val intentDeferred = async { parseSearchIntent(query) }
             val queryEmbeddingDeferred = async { semanticSearchEngine.getEmbedding(semanticQuery) }
@@ -122,8 +112,8 @@ class ListingsRepository(
                     0f
                 }
                 val lexicalScore = textSimilarityScore(listing, expandedQueryTokens)
-                val phraseBoost = if (SearchTextNormalizer.normalize("${listing.title} ${listing.description}")
-                    .contains(normalizedQuery)
+                val phraseBoost = if (
+                    SearchTextNormalizer.normalize("${listing.title} ${listing.description}").contains(normalizedQuery)
                 ) {
                     0.2f
                 } else {
@@ -133,8 +123,6 @@ class ListingsRepository(
                 listing to finalScore
             }.filter { (listing, finalScore) ->
                 var matches = finalScore >= 0.16f
-                
-                // Overlay Groq Intent Filters
                 intent?.let {
                     if (it.max_price != null && listing.price > it.max_price) matches = false
                     if (it.category != null && !listing.categoryId.contains(it.category, ignoreCase = true)) matches = false
@@ -149,7 +137,6 @@ class ListingsRepository(
                 }
             }.map { it.first }
 
-            // 4. Update Cache
             val resultIdsJson = listAdapter.toJson(rankedListings.map { it.id })
             val intentJson = moshi.adapter(SearchIntent::class.java).toJson(intent)
             dao.insertSearchCache(SearchCacheEntity(normalizedQuery, resultIdsJson, intentJson))
@@ -157,6 +144,83 @@ class ListingsRepository(
             emit(rankedListings)
         }
     }.flowOn(Dispatchers.IO)
+
+    override suspend fun searchListingsFiltered(
+        q: String?,
+        categoryId: String?,
+        condition: String?,
+        minPrice: Int?,
+        maxPrice: Int?
+    ): List<Listing> {
+        return api.getListings(
+            q = q,
+            categoryId = categoryId,
+            condition = condition,
+            minPrice = minPrice,
+            maxPrice = maxPrice,
+            status = "published"
+        ).map { it.toDomain() }
+    }
+
+    override suspend fun getMyListings(): List<Listing> {
+        return api.getMyListings().map { it.toDomain() }
+    }
+
+    override suspend fun createListing(
+        sellerId: String,
+        categoryId: String,
+        title: String,
+        description: String,
+        price: Int,
+        condition: String,
+        images: List<String>,
+        location: String
+    ): Listing {
+        return api.createListing(
+            CreateListingDto(
+                sellerId = sellerId,
+                categoryId = categoryId,
+                title = title,
+                description = description,
+                price = price,
+                condition = condition,
+                images = images,
+                location = location
+            )
+        ).toDomain()
+    }
+
+    private suspend fun parseSearchIntent(query: String): SearchIntent? {
+        return withContext(Dispatchers.IO) {
+            try {
+                val prompt = """
+                    Extract search filters from the following query in JSON format. Use these fields:
+                    - product_name (string)
+                    - max_price (number)
+                    - category (string)
+                    - condition (string: "new" or "used")
+                    - proximity_preference (number in km)
+                    - sort_order (string: "relevance", "price_low", "price_high")
+
+                    Return ONLY the JSON object.
+                    Query: "$query"
+                """.trimIndent()
+
+                val response = groqApi.completeChat(
+                    apiKey = "Bearer ${BuildConfig.GROQ_API_KEY}",
+                    request = GroqRequest(messages = listOf(GroqMessage(role = "user", content = prompt)))
+                )
+
+                val content = response.choices.firstOrNull()?.message?.content ?: return@withContext null
+                val json = content.substringAfter("```json").substringBefore("```").trim()
+                val finalJson = if (json.startsWith("{")) json else content
+                moshi.adapter(SearchIntent::class.java).fromJson(finalJson)
+            } catch (e: Exception) {
+                e.printStackTrace()
+                null
+            }
+        }
+    }
 
     private fun textSimilarityScore(listing: Listing, expandedQueryTokens: List<String>): Float {
         if (expandedQueryTokens.isEmpty()) return 0f
@@ -205,59 +269,10 @@ class ListingsRepository(
             for (j in 1..b.length) {
                 val current = costs[j]
                 val substitutionCost = if (a[i - 1] == b[j - 1]) 0 else 1
-                costs[j] = minOf(
-                    costs[j] + 1,
-                    costs[j - 1] + 1,
-                    previous + substitutionCost
-                )
+                costs[j] = minOf(costs[j] + 1, costs[j - 1] + 1, previous + substitutionCost)
                 previous = current
             }
         }
         return costs[b.length]
-    }
-
-    override suspend fun searchListings(
-        q: String?,
-        categoryId: String?,
-        condition: String?,
-        minPrice: Int?,
-        maxPrice: Int?
-    ): List<Listing> {
-        return api.getListings(
-            q = q,
-            categoryId = categoryId,
-            condition = condition,
-            minPrice = minPrice,
-            maxPrice = maxPrice,
-            status = "published"
-        ).map { it.toDomain() }
-    }
-
-    override suspend fun getMyListings(): List<Listing> {
-        return api.getMyListings().map { it.toDomain() }
-    }
-
-    override suspend fun createListing(
-        sellerId: String,
-        categoryId: String,
-        title: String,
-        description: String,
-        price: Int,
-        condition: String,
-        images: List<String>,
-        location: String
-    ): Listing {
-        return api.createListing(
-            CreateListingDto(
-                sellerId = sellerId,
-                categoryId = categoryId,
-                title = title,
-                description = description,
-                price = price,
-                condition = condition,
-                images = images,
-                location = location
-            )
-        ).toDomain()
     }
 }
