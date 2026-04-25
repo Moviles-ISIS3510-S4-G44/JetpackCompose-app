@@ -2,6 +2,8 @@ package com.university.marketplace.map
 
 import android.Manifest
 import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -21,6 +23,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.SignalWifiOff
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -50,11 +53,15 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import coil.compose.AsyncImage
 import com.google.android.gms.location.LocationServices
+import com.google.android.gms.maps.CameraUpdateFactory
+import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
+import com.google.android.gms.maps.model.LatLngBounds
 import com.google.maps.android.compose.GoogleMap
 import com.google.maps.android.compose.MapUiSettings
 import com.google.maps.android.compose.Marker
@@ -120,29 +127,32 @@ fun MapViewScreen(
         ) == PackageManager.PERMISSION_GRANTED
 
         if (hasFineLocation || hasCoarseLocation) {
-            fusedLocationClient.lastLocation.addOnSuccessListener { location ->
-                if (location != null) {
-                    userLocation = LatLng(location.latitude, location.longitude)
-                }
-            }
+            updateUserLocation()
+        } else {
+            permissionLauncher.launch(
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                )
+            )
         }
     }
 
     val appBarTitle = if (uiState is MapUiState.Success) {
         (uiState as MapUiState.Success).listing.name
     } else {
-        "Location"
+        "Listing Location"
     }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(appBarTitle, fontWeight = FontWeight.Bold) },
+                title = { Text(appBarTitle, fontWeight = FontWeight.SemiBold, fontSize = 18.sp) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back",
+                            contentDescription = "Volver",
                             tint = MarketplaceDark
                         )
                     }
@@ -158,7 +168,6 @@ fun MapViewScreen(
             modifier = Modifier
                 .padding(padding)
                 .fillMaxSize()
-                .background(MarketplaceBackground)
         ) {
             OfflineBanner(
                 isOnline = isOnline,
@@ -200,6 +209,7 @@ fun MapViewScreen(
                                 }
                             } ?: "Location unavailable"
                         }
+                        var isMapLoaded by remember(listing.id) { mutableStateOf(false) }
 
                         val cameraPositionState = rememberCameraPositionState {
                             position = CameraPosition.fromLatLngZoom(

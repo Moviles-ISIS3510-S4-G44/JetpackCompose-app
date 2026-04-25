@@ -1,7 +1,11 @@
 package com.university.marketplace.domain
 
+import com.university.marketplace.data.api.SearchIntent
+import kotlinx.coroutines.flow.Flow
+
 interface ListingRepository {
-    suspend fun getActiveListings(): List<Listing>
+    fun getActiveListings(): Flow<List<Listing>>
+    suspend fun refreshListings()
     suspend fun getListingById(id: String): Listing
     suspend fun searchListings(
         q: String? = null,
@@ -22,4 +26,3 @@ interface ListingRepository {
         location: String
     ): Listing
 }
-
