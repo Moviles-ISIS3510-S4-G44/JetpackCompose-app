@@ -3,6 +3,8 @@ package com.university.marketplace.data.location
 import android.annotation.SuppressLint
 import android.content.Context
 import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
+import com.google.android.gms.tasks.CancellationTokenSource
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
 
@@ -19,11 +21,32 @@ class AndroidLocationRepository(
         return suspendCancellableCoroutine { continuation ->
             fusedLocationClient.lastLocation
                 .addOnSuccessListener { location ->
-                    val userLocation = location?.let {
-                        UserLocation(it.latitude, it.longitude)
-                    }
-                    if (continuation.isActive) {
-                        continuation.resume(userLocation)
+                    if (location != null) {
+                        if (continuation.isActive) {
+                            continuation.resume(UserLocation(location.latitude, location.longitude))
+                        }
+                    } else {
+                        val cancellationTokenSource = CancellationTokenSource()
+                        fusedLocationClient.getCurrentLocation(
+                            Priority.PRIORITY_BALANCED_POWER_ACCURACY,
+                            cancellationTokenSource.token
+                        )
+                            .addOnSuccessListener { currentLocation ->
+                                val userLocation = currentLocation?.let {
+                                    UserLocation(it.latitude, it.longitude)
+                                }
+                                if (continuation.isActive) {
+                                    continuation.resume(userLocation)
+                                }
+                            }
+                            .addOnFailureListener {
+                                if (continuation.isActive) {
+                                    continuation.resume(null)
+                                }
+                            }
+                        continuation.invokeOnCancellation {
+                            cancellationTokenSource.cancel()
+                        }
                     }
                 }
                 .addOnFailureListener {

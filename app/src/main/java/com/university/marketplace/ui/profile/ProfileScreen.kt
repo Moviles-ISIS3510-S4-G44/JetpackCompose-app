@@ -121,7 +121,9 @@ fun ProfileRoute(
         } catch (_: UnauthorizedAuthException) {
             onUnauthorized()
         } catch (error: AuthException) {
-            errorMessage = error.message ?: "We could not load your profile."
+            errorMessage = error.toUserFriendlyMessage()
+        } catch (error: Throwable) {
+            errorMessage = error.toUserFriendlyMessage()
         } finally {
             isLoading = false
         }
