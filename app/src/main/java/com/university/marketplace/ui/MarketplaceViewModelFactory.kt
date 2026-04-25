@@ -26,7 +26,8 @@ class MarketplaceViewModelFactory(
                     getActiveListingsUseCase = container.getActiveListingsUseCase,
                     searchListingsByRelevanceUseCase = container.searchListingsByRelevanceUseCase,
                     getFilteredListingsUseCase = container.getFilteredListingsUseCase,
-                    categoryRepository = container.categoryRepository
+                    categoryRepository = container.categoryRepository,
+                    locationRepository = container.locationRepository
                 ) as T
             }
             modelClass.isAssignableFrom(ListingDetailViewModel::class.java) -> {

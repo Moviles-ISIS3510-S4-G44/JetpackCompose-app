@@ -1,5 +1,10 @@
 package com.university.marketplace.ui.home
 
+import android.Manifest
+import android.content.Context
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -56,10 +61,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import coil.compose.AsyncImage
 import com.university.marketplace.domain.Category
+import com.university.marketplace.ui.common.OfflineBanner
+import com.university.marketplace.ui.common.rememberOfflineBannerController
 import com.university.marketplace.ui.theme.MarketplaceDark
 import com.university.marketplace.ui.theme.MarketplaceWhite
 import com.university.marketplace.ui.theme.MarketplaceYellow
@@ -75,17 +84,38 @@ fun HomeMarketplaceScreen(
     isOnline: Boolean,
     viewModel: HomeViewModel
 ) {
+    val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
     val categories by viewModel.categories.collectAsState()
     val selectedCategoryId by viewModel.selectedCategoryId.collectAsState()
     val isLandscape = LocalConfiguration.current.screenWidthDp > LocalConfiguration.current.screenHeightDp
+    val offlineBannerController = rememberOfflineBannerController(isOnline)
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) {
+        viewModel.refreshUserLocation()
+    }
 
     LaunchedEffect(isOnline) {
         if (isOnline) {
             viewModel.loadListings()
         } else {
             viewModel.showOfflineState()
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        if (hasLocationPermission(context)) {
+            viewModel.refreshUserLocation()
+        } else {
+            permissionLauncher.launch(
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                )
+            )
         }
     }
 
@@ -112,6 +142,12 @@ fun HomeMarketplaceScreen(
                 .fillMaxSize()
                 .background(Color.White)
         ) {
+            OfflineBanner(
+                isOnline = isOnline,
+                offlineBannerController = offlineBannerController,
+                message = "Sin conexion. Algunas funciones pueden no estar disponibles."
+            )
+
             SearchHeader(
                 searchQuery = searchQuery,
                 isOnline = isOnline,
@@ -378,6 +414,20 @@ private fun DistanceLabel(distance: String?) {
         color = Color.Gray,
         modifier = Modifier.padding(bottom = 6.dp)
     )
+}
+
+private fun hasLocationPermission(context: Context): Boolean {
+    val hasFineLocation = ContextCompat.checkSelfPermission(
+        context,
+        Manifest.permission.ACCESS_FINE_LOCATION
+    ) == PackageManager.PERMISSION_GRANTED
+
+    val hasCoarseLocation = ContextCompat.checkSelfPermission(
+        context,
+        Manifest.permission.ACCESS_COARSE_LOCATION
+    ) == PackageManager.PERMISSION_GRANTED
+
+    return hasFineLocation || hasCoarseLocation
 }
 
 @Composable

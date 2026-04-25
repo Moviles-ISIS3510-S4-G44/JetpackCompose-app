@@ -125,7 +125,7 @@ class ListingsRepository(
                 var matches = finalScore >= 0.16f
                 intent?.let {
                     if (it.max_price != null && listing.price > it.max_price) matches = false
-                    if (it.category != null && !listing.categoryId.contains(it.category, ignoreCase = true)) matches = false
+                    if (it.category != null && !matchesIntentCategory(listing, it.category)) matches = false
                     if (it.condition != null && !listing.condition.equals(it.condition, ignoreCase = true)) matches = false
                 }
                 matches
@@ -255,6 +255,21 @@ class ListingsRepository(
             }
         }
         return if (bestDistance <= 2) bestCandidate else token
+    }
+
+    private fun matchesIntentCategory(listing: Listing, categoryIntent: String): Boolean {
+        val normalizedIntent = SearchTextNormalizer.normalize(categoryIntent)
+        if (normalizedIntent.isBlank()) return true
+
+        val intentTokens = SearchQueryExpander.expandTokens(
+            SearchTextNormalizer.tokenize(normalizedIntent)
+        )
+
+        val listingText = SearchTextNormalizer.normalize(
+            "${listing.categoryId} ${listing.title} ${listing.description}"
+        )
+
+        return intentTokens.any { token -> listingText.contains(token) }
     }
 
     private fun levenshteinDistance(a: String, b: String): Int {

@@ -2,7 +2,6 @@ package com.university.marketplace
 
 import android.os.Bundle
 import android.util.Log
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.Composable
@@ -15,6 +14,13 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Text
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.launch
 import androidx.navigation.NavType
@@ -112,15 +118,20 @@ fun AppNavigation(container: com.university.marketplace.di.AppContainer) {
     }
 
     var lastNotifiedOnline by rememberSaveable { mutableStateOf<Boolean?>(null) }
+    var uiMessage by rememberSaveable { mutableStateOf<String?>(null) }
     LaunchedEffect(isOnline) {
         val previous = lastNotifiedOnline
         lastNotifiedOnline = isOnline
         if (previous == null || previous == isOnline) return@LaunchedEffect
-        val message = if (isOnline) "Connection restored" else "No internet connection"
-        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+        uiMessage = if (isOnline) {
+            "Conexion restablecida"
+        } else {
+            "Sin conexion. Algunas acciones requeriran internet."
+        }
     }
 
-    NavHost(navController = navController, startDestination = startDestination) {
+    Box {
+        NavHost(navController = navController, startDestination = startDestination) {
         composable("sign_in") {
             val authViewModel = viewModel<AuthViewModel>(
                 factory = AuthViewModelFactory(authRepository, locationRepository)
@@ -259,7 +270,7 @@ fun AppNavigation(container: com.university.marketplace.di.AppContainer) {
                                         "chat/${conv.id}?name=${android.net.Uri.encode(conv.otherUserName)}"
                                     )
                                 } catch (_: Exception) {
-                                    Toast.makeText(context, "Could not start conversation", Toast.LENGTH_SHORT).show()
+                                    uiMessage = "No fue posible abrir el chat en este momento"
                                 }
                             }
                         }
@@ -325,6 +336,18 @@ fun AppNavigation(container: com.university.marketplace.di.AppContainer) {
                 otherUserName = otherUserName,
                 onBack = { navController.popBackStack() },
                 viewModel = chatViewModel
+            )
+        }
+        }
+
+        uiMessage?.let { message ->
+            Text(
+                text = message,
+                color = Color.White,
+                modifier = androidx.compose.ui.Modifier
+                    .fillMaxWidth()
+                    .background(Color(0xFF1F2937))
+                    .padding(horizontal = 12.dp, vertical = 10.dp)
             )
         }
     }

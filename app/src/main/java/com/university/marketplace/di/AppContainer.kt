@@ -9,6 +9,8 @@ import com.university.marketplace.data.ListingsRepository
 import com.university.marketplace.data.PurchasesRepository
 import com.university.marketplace.data.api.NetworkModule
 import com.university.marketplace.data.local.AppDatabase
+import com.university.marketplace.data.location.AndroidLocationRepository
+import com.university.marketplace.data.location.LocationRepository
 import com.university.marketplace.data.search.SemanticSearchEngine
 import com.university.marketplace.domain.CategoryRepository
 import com.university.marketplace.domain.ChatRepository
@@ -27,6 +29,7 @@ import com.university.marketplace.domain.usecase.SearchListingsByRelevanceUseCas
 interface AppContainer {
     val listingRepository: ListingRepository
     val categoryRepository: CategoryRepository
+    val locationRepository: LocationRepository
     val purchaseRepository: PurchaseRepository
     val interactionsRepository: InteractionsRepository
     val chatRepository: ChatRepository
@@ -62,6 +65,10 @@ class DefaultAppContainer(context: Context) : AppContainer {
 
     override val categoryRepository: CategoryRepository by lazy {
         CategoriesRepository(api = NetworkModule.categoriesApi)
+    }
+
+    override val locationRepository: LocationRepository by lazy {
+        AndroidLocationRepository(context)
     }
 
     override val interactionsRepository: InteractionsRepository by lazy {

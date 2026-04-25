@@ -1,7 +1,9 @@
 package com.university.marketplace.ui.home
 
+import android.location.Location
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.university.marketplace.data.location.LocationRepository
 import com.university.marketplace.data.toUserFriendlyMessage
 import com.university.marketplace.domain.Category
 import com.university.marketplace.domain.Listing
@@ -17,6 +19,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
+import java.util.Locale
 import kotlin.math.max
 
 class HomeViewModel(
@@ -24,7 +27,8 @@ class HomeViewModel(
     private val searchListingsByRelevanceUseCase: SearchListingsByRelevanceUseCase,
     @Suppress("UNUSED_PARAMETER")
     private val getFilteredListingsUseCase: GetFilteredListingsUseCase,
-    private val categoryRepository: CategoryRepository
+    private val categoryRepository: CategoryRepository,
+    private val locationRepository: LocationRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<HomeUiState>(HomeUiState.Loading)
@@ -42,6 +46,7 @@ class HomeViewModel(
     private var allListings: List<Listing> = emptyList()
     private var currentSearchResults: List<Listing>? = null
     private var searchJob: Job? = null
+    private var userLocation: Location? = null
 
     private val listingInterestWeights = mutableMapOf<String, Float>()
     private val categoryInterestWeights = mutableMapOf<String, Float>()
@@ -51,6 +56,19 @@ class HomeViewModel(
         observeListings()
         observeSearch()
         loadListings()
+        refreshUserLocation()
+    }
+
+    fun refreshUserLocation() {
+        viewModelScope.launch {
+            locationRepository.getLastKnownLocation()?.let { loc ->
+                userLocation = Location("user").apply {
+                    latitude = loc.latitude
+                    longitude = loc.longitude
+                }
+                applyFiltersAndPublish()
+            }
+        }
     }
 
     private fun loadCategories() {
@@ -114,7 +132,7 @@ class HomeViewModel(
     fun showOfflineState() {
         if (_uiState.value is HomeUiState.Success) return
         _uiState.value = HomeUiState.Error(
-            "You appear to be offline. Please check your connection and try again."
+            "Parece que no tienes conexion. Revisa tu internet e intenta de nuevo."
         )
     }
 
@@ -146,7 +164,26 @@ class HomeViewModel(
             .toList()
 
         val weighted = applyUserBehaviorWeights(filtered)
-        updateSections(weighted.map { it.toUiModel() })
+        updateSections(weighted.map { it.toUiModelWithDistance() })
+    }
+
+    private fun Listing.toUiModelWithDistance(): ListingUiModel {
+        val uiModel = toUiModel()
+        val distanceStr = if (latitude != null && longitude != null && userLocation != null) {
+            val dest = Location("dest").apply {
+                latitude = this@toUiModelWithDistance.latitude
+                longitude = this@toUiModelWithDistance.longitude
+            }
+            val distanceMeters = userLocation!!.distanceTo(dest)
+            if (distanceMeters < 1000) {
+                "Aprox. ${distanceMeters.toInt()} m"
+            } else {
+                String.format(Locale.US, "Aprox. %.1f km", distanceMeters / 1000f)
+            }
+        } else {
+            null
+        }
+        return uiModel.copy(distance = distanceStr)
     }
 
     private fun applyUserBehaviorWeights(listings: List<Listing>): List<Listing> {
