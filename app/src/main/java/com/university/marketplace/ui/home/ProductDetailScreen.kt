@@ -2,6 +2,8 @@ package com.university.marketplace.ui.home
 
 import android.Manifest
 import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -85,22 +87,24 @@ fun ProductDetailScreen(
         ) == PackageManager.PERMISSION_GRANTED
 
         if (hasFineLocation || hasCoarseLocation) {
-            fusedLocationClient.lastLocation
-                .addOnSuccessListener { location ->
-                    if (location != null) {
-                        userCoordinates = location.latitude to location.longitude
-                    }
-                }
+            updateLocation()
+        } else {
+            permissionLauncher.launch(
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                )
+            )
         }
     }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Product Details", fontSize = 18.sp, fontWeight = FontWeight.Bold) },
+                title = { Text("Detalle del producto", fontSize = 18.sp, fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
                     }
                 },
                 actions = {
@@ -132,7 +136,7 @@ fun ProductDetailScreen(
                         ) {
                             Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = null, tint = MarketplaceDark)
                             Spacer(Modifier.width(8.dp))
-                            Text("Contact Seller", color = MarketplaceDark, fontWeight = FontWeight.Bold)
+                            Text("Contactar vendedor", color = MarketplaceDark, fontWeight = FontWeight.Bold)
                         }
 
                         Surface(
