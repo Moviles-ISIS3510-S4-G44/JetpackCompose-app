@@ -43,6 +43,9 @@ class HomeViewModel(
     private val _selectedCategoryId = MutableStateFlow<String?>(null)
     val selectedCategoryId: StateFlow<String?> = _selectedCategoryId.asStateFlow()
 
+    private val _selectedPriceCap = MutableStateFlow<Int?>(null)
+    val selectedPriceCap: StateFlow<Int?> = _selectedPriceCap.asStateFlow()
+
     private var allListings: List<Listing> = emptyList()
     private var currentSearchResults: List<Listing>? = null
     private var searchJob: Job? = null
@@ -145,6 +148,11 @@ class HomeViewModel(
         applyFiltersAndPublish()
     }
 
+    fun onPriceCapSelected(priceCap: Int?) {
+        _selectedPriceCap.value = if (_selectedPriceCap.value == priceCap) null else priceCap
+        applyFiltersAndPublish()
+    }
+
     fun onListingOpened(listing: ListingUiModel) {
         listingInterestWeights[listing.id] = (listingInterestWeights[listing.id] ?: 0f) + 1.5f
         val normalizedCategory = listing.category.trim().lowercase()
@@ -155,11 +163,15 @@ class HomeViewModel(
     private fun applyFiltersAndPublish() {
         val baseListings = currentSearchResults ?: allListings
         val categoryId = _selectedCategoryId.value
+        val priceCap = _selectedPriceCap.value
 
         val filtered = baseListings
             .asSequence()
             .filter { listing ->
                 categoryId == null || listing.categoryId.equals(categoryId, ignoreCase = true)
+            }
+            .filter { listing ->
+                priceCap == null || listing.price <= priceCap.toDouble()
             }
             .toList()
 
@@ -197,13 +209,15 @@ class HomeViewModel(
     }
 
     private fun updateSections(listings: List<ListingUiModel>) {
-        val isFiltering = _searchQuery.value.isNotEmpty() || _selectedCategoryId.value != null
+        val isFiltering = _searchQuery.value.isNotEmpty() || _selectedCategoryId.value != null || _selectedPriceCap.value != null
         val featured = listings.take(4)
         val recent = listings.drop(4)
         _uiState.value = HomeUiState.Success(
             featured = featured,
             recent = recent,
-            isSearching = isFiltering
+            isSearching = isFiltering,
+            selectedCategory = _selectedCategoryId.value ?: "Todo",
+            selectedPriceCap = _selectedPriceCap.value
         )
     }
 }

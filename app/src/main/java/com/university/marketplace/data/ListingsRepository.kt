@@ -103,6 +103,7 @@ class ListingsRepository(
 
             val intent = intentDeferred.await()
             val queryEmbedding = queryEmbeddingDeferred.await()
+            val maxPriceFromIntent = intent?.max_price ?: extractMaxPriceFromQuery(query)
 
             val rankedListings = cachedEntities.map { entity ->
                 val listing = entity.toDomain()
@@ -124,10 +125,10 @@ class ListingsRepository(
             }.filter { (listing, finalScore) ->
                 var matches = finalScore >= 0.16f
                 intent?.let {
-                    if (it.max_price != null && listing.price > it.max_price) matches = false
                     if (it.category != null && !matchesIntentCategory(listing, it.category)) matches = false
                     if (it.condition != null && !listing.condition.equals(it.condition, ignoreCase = true)) matches = false
                 }
+                if (maxPriceFromIntent != null && listing.price > maxPriceFromIntent) matches = false
                 matches
             }.sortedByDescending { pair ->
                 when (intent?.sort_order) {
@@ -269,7 +270,34 @@ class ListingsRepository(
             "${listing.categoryId} ${listing.title} ${listing.description}"
         )
 
-        return intentTokens.any { token -> listingText.contains(token) }
+        val semanticCategoryGroups = mapOf(
+            "electronica" to setOf("electronica", "electronic", "laptop", "pc", "monitor", "teclado", "mouse", "camara", "celular", "smartphone", "tablet"),
+            "libros" to setOf("libro", "book", "novela", "texto", "manual", "kindle"),
+            "muebles" to setOf("mueble", "escritorio", "mesa", "silla", "sofa", "lampara"),
+            "accesorios" to setOf("accesorio", "mochila", "cable", "usb", "audifono", "auricular", "airpods")
+        )
+
+        val categoryGroupMatch = semanticCategoryGroups.any { (group, keywords) ->
+            val intentMatchesGroup = intentTokens.any { it == group || keywords.contains(it) }
+            intentMatchesGroup && keywords.any { keyword -> listingText.contains(keyword) }
+        }
+
+        return categoryGroupMatch || intentTokens.any { token -> listingText.contains(token) }
+    }
+
+    private fun extractMaxPriceFromQuery(query: String): Double? {
+        val normalized = SearchTextNormalizer.normalize(query)
+        val regex = "(\\d+[\\d\\.]*)\\s*(k|mil|m|millon|millones)?".toRegex()
+        val match = regex.find(normalized) ?: return null
+        val numberRaw = match.groupValues[1].replace(".", "")
+        val base = numberRaw.toDoubleOrNull() ?: return null
+        val multiplier = when (match.groupValues.getOrNull(2).orEmpty()) {
+            "k", "mil" -> 1_000.0
+            "m", "millon", "millones" -> 1_000_000.0
+            else -> 1.0
+        }
+        val value = base * multiplier
+        return if (value > 0.0) value else null
     }
 
     private fun levenshteinDistance(a: String, b: String): Int {

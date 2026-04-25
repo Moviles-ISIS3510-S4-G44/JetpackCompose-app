@@ -14,14 +14,20 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.foundation.background
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Text
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import androidx.navigation.NavType
 import androidx.navigation.navArgument
@@ -127,6 +133,13 @@ fun AppNavigation(container: com.university.marketplace.di.AppContainer) {
             "Conexion restablecida"
         } else {
             "Sin conexion. Algunas acciones requeriran internet."
+        }
+    }
+
+    LaunchedEffect(uiMessage) {
+        if (uiMessage != null) {
+            delay(2800)
+            uiMessage = null
         }
     }
 
@@ -340,15 +353,28 @@ fun AppNavigation(container: com.university.marketplace.di.AppContainer) {
         }
         }
 
-        uiMessage?.let { message ->
-            Text(
-                text = message,
-                color = Color.White,
-                modifier = androidx.compose.ui.Modifier
-                    .fillMaxWidth()
-                    .background(Color(0xFF1F2937))
-                    .padding(horizontal = 12.dp, vertical = 10.dp)
-            )
+        AnimatedVisibility(
+            visible = uiMessage != null,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = androidx.compose.ui.Modifier
+                .fillMaxSize()
+                .padding(top = 12.dp, start = 12.dp, end = 12.dp)
+        ) {
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = Color(0xFF0F766E)
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+            ) {
+                Text(
+                    text = uiMessage.orEmpty(),
+                    color = Color.White,
+                    modifier = androidx.compose.ui.Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 14.dp, vertical = 10.dp)
+                )
+            }
         }
     }
 }

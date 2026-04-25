@@ -89,6 +89,7 @@ fun HomeMarketplaceScreen(
     val searchQuery by viewModel.searchQuery.collectAsState()
     val categories by viewModel.categories.collectAsState()
     val selectedCategoryId by viewModel.selectedCategoryId.collectAsState()
+    val selectedPriceCap by viewModel.selectedPriceCap.collectAsState()
     val isLandscape = LocalConfiguration.current.screenWidthDp > LocalConfiguration.current.screenHeightDp
     val offlineBannerController = rememberOfflineBannerController(isOnline)
 
@@ -153,8 +154,10 @@ fun HomeMarketplaceScreen(
                 isOnline = isOnline,
                 categories = categories,
                 selectedCategoryId = selectedCategoryId,
+                selectedPriceCap = selectedPriceCap,
                 onQueryChanged = viewModel::onSearchQueryChanged,
-                onCategorySelected = viewModel::onCategorySelected
+                onCategorySelected = viewModel::onCategorySelected,
+                onPriceSelected = viewModel::onPriceCapSelected
             )
 
             when (val state = uiState) {
@@ -227,9 +230,13 @@ private fun SearchHeader(
     isOnline: Boolean,
     categories: List<Category>,
     selectedCategoryId: String?,
+    selectedPriceCap: Int?,
     onQueryChanged: (String) -> Unit,
-    onCategorySelected: (String?) -> Unit
+    onCategorySelected: (String?) -> Unit,
+    onPriceSelected: (Int?) -> Unit
 ) {
+    val priceOptions = listOf<Int?>(null, 100_000, 300_000, 500_000, 1_000_000)
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -301,6 +308,28 @@ private fun SearchHeader(
                     selected = selectedCategoryId == category.id,
                     onClick = { onCategorySelected(category.id) },
                     label = { Text(category.name) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = MarketplaceWhite,
+                        containerColor = Color.White.copy(alpha = 0.65f)
+                    )
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            items(priceOptions, key = { it ?: -1 }) { cap ->
+                val label = cap?.let {
+                    "Hasta ${String.format(Locale.US, "%,d", it).replace(',', '.')}"
+                } ?: "Sin tope"
+
+                FilterChip(
+                    selected = selectedPriceCap == cap,
+                    onClick = { onPriceSelected(cap) },
+                    label = { Text(label) },
                     colors = FilterChipDefaults.filterChipColors(
                         selectedContainerColor = MarketplaceWhite,
                         containerColor = Color.White.copy(alpha = 0.65f)
