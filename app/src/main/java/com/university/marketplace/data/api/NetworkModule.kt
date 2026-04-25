@@ -26,7 +26,8 @@ object NetworkModule {
     private lateinit var authApiInternal: AuthApiService
     private lateinit var listingsApiInternal: ListingsApi
     private lateinit var interactionsApiInternal: InteractionsApi
-    private lateinit var groqApiInternal: GroqApi
+    private lateinit var categoriesApiInternal: CategoriesApi
+    private lateinit var purchasesApiInternal: PurchasesApi
 
     val authSessionStorage: AuthSessionStorage
         get() = synchronized(this) { authSessionStorageInternal }
@@ -40,8 +41,11 @@ object NetworkModule {
     val interactionsApi: InteractionsApi
         get() = synchronized(this) { interactionsApiInternal }
 
-    val groqApi: GroqApi
-        get() = synchronized(this) { groqApiInternal }
+    val categoriesApi: CategoriesApi
+        get() = synchronized(this) { categoriesApiInternal }
+
+    val purchasesApi: PurchasesApi
+        get() = synchronized(this) { purchasesApiInternal }
 
     fun initialize(context: Context) {
         if (initialized) return
@@ -54,7 +58,7 @@ object NetworkModule {
                 level = if (BuildConfig.DEBUG) {
                     HttpLoggingInterceptor.Level.BODY
                 } else {
-                    HttpLoggingInterceptor.Level.BASIC
+                    HttpLoggingInterceptor.Level.NONE
                 }
             }
 
@@ -108,7 +112,8 @@ object NetworkModule {
             authApiInternal = authenticatedRetrofit.create(AuthApiService::class.java)
             listingsApiInternal = authenticatedMoshiRetrofit.create(ListingsApi::class.java)
             interactionsApiInternal = authenticatedRetrofit.create(InteractionsApi::class.java)
-            groqApiInternal = groqRetrofit.create(GroqApi::class.java)
+            categoriesApiInternal = authenticatedMoshiRetrofit.create(CategoriesApi::class.java)
+            purchasesApiInternal = authenticatedMoshiRetrofit.create(PurchasesApi::class.java)
 
             initialized = true
         }

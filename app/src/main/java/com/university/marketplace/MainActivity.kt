@@ -9,8 +9,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.launch
@@ -20,6 +23,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.university.marketplace.di.DefaultAppContainer
+import com.university.marketplace.data.auth.AuthException
 import com.university.marketplace.data.auth.AuthRepositoryFactory
 import com.university.marketplace.data.auth.UnauthorizedAuthException
 import com.university.marketplace.connectivity.AndroidConnectivityMonitor
@@ -31,11 +35,17 @@ import com.university.marketplace.ui.auth.SignInScreen
 import com.university.marketplace.ui.auth.SignUpScreen
 import com.university.marketplace.ui.MarketplaceViewModelFactory
 import com.university.marketplace.ui.home.HomeMarketplaceScreen
-import com.university.marketplace.ui.home.HomeViewModel
 import com.university.marketplace.ui.home.CreateListingScreen
+import com.university.marketplace.ui.home.CreateListingViewModel
+import com.university.marketplace.ui.home.HomeViewModel
 import com.university.marketplace.ui.home.ListingDetailViewModel
 import com.university.marketplace.ui.home.ProductDetailScreen
+import com.university.marketplace.ui.profile.MyListingsViewModel
 import com.university.marketplace.ui.profile.ProfileRoute
+import com.university.marketplace.ui.purchases.PurchaseHistoryScreen
+import com.university.marketplace.ui.purchases.PurchaseHistoryViewModel
+import com.university.marketplace.ui.purchases.SalesHistoryScreen
+import com.university.marketplace.ui.purchases.SalesHistoryViewModel
 import com.university.marketplace.ui.theme.JetpackComposeAppTheme
 
 class MainActivity : ComponentActivity() {
@@ -46,19 +56,20 @@ class MainActivity : ComponentActivity() {
                 ?: DefaultAppContainer(applicationContext)
         setContent {
             JetpackComposeAppTheme {
-                AppNavigation(factory = MarketplaceViewModelFactory(container))
+                AppNavigation(container = container)
             }
         }
     }
 }
 
 @Composable
-fun AppNavigation(factory: MarketplaceViewModelFactory) {
+fun AppNavigation(container: com.university.marketplace.di.AppContainer) {
     val navController = rememberNavController()
     val context = LocalContext.current
     val connectivityMonitor = remember { AndroidConnectivityMonitor(context.applicationContext) }
     val isOnline by connectivityMonitor.isOnline.collectAsState(initial = connectivityMonitor.isCurrentlyOnline())
     val authRepository = remember { AuthRepositoryFactory.create(context.applicationContext) }
+    val factory = remember(container, authRepository) { MarketplaceViewModelFactory(container, authRepository) }
     val coroutineScope = rememberCoroutineScope()
     val startDestination = if (authRepository.hasActiveSession()) "home" else "sign_in"
     
@@ -81,18 +92,13 @@ fun AppNavigation(factory: MarketplaceViewModelFactory) {
         }
     }
 
-    val navigateToTopLevel: (String) -> Unit = { route ->
-        navController.navigate(route) {
-            popUpTo("home") { inclusive = false }
-            launchSingleTop = true
-        }
-    }
-
+    var lastNotifiedOnline by rememberSaveable { mutableStateOf<Boolean?>(null) }
     LaunchedEffect(isOnline) {
-        if (!isOnline) {
-            // Optional: Subtle notification, but don't block UI
-            // Toast.makeText(context, "Modo offline", Toast.LENGTH_SHORT).show()
-        }
+        val previous = lastNotifiedOnline
+        lastNotifiedOnline = isOnline
+        if (previous == null || previous == isOnline) return@LaunchedEffect
+        val message = if (isOnline) "Connection restored" else "No internet connection"
+        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
     }
 
     NavHost(navController = navController, startDestination = startDestination) {
@@ -134,7 +140,18 @@ fun AppNavigation(factory: MarketplaceViewModelFactory) {
         }
         composable("home") {
             val homeViewModel: HomeViewModel = viewModel(factory = factory)
-            
+            LaunchedEffect(Unit) {
+                if (!isOnline) return@LaunchedEffect
+                try {
+                    authRepository.getCurrentUser()
+                } catch (_: UnauthorizedAuthException) {
+                    onUnauthorized()
+                } catch (error: AuthException) {
+                    Log.w("MainActivity", "Failed to verify session on home.", error)
+                } catch (error: Throwable) {
+                    Log.w("MainActivity", "Unexpected error verifying session on home.", error)
+                }
+            }
             HomeMarketplaceScreen(
                 viewModel = homeViewModel,
                 onNavigateToProfile = {
@@ -148,10 +165,14 @@ fun AppNavigation(factory: MarketplaceViewModelFactory) {
                     // Allowed even offline (Eventual connectivity)
                     navController.navigate("create_listing")
                 },
+                onNavigateToPurchases = {
+                    navController.navigate("purchase_history")
+                },
                 isOnline = isOnline
             )
         }
         composable("profile") {
+            val myListingsViewModel: MyListingsViewModel = viewModel(factory = factory)
             ProfileRoute(
                 authRepository = authRepository,
                 isOnline = isOnline,
@@ -162,7 +183,10 @@ fun AppNavigation(factory: MarketplaceViewModelFactory) {
                     navController.navigate("create_listing")
                 },
                 onLogout = onLogout,
-                onUnauthorized = onUnauthorized
+                onUnauthorized = onUnauthorized,
+                myListingsViewModel = myListingsViewModel,
+                onNavigateToDetail = { id -> navController.navigate("product_detail/$id") },
+                onNavigateToSales = { navController.navigate("sales_history") }
             )
         }
         composable(
@@ -185,13 +209,11 @@ fun AppNavigation(factory: MarketplaceViewModelFactory) {
             }
         }
         composable("create_listing") {
+            val createListingViewModel: CreateListingViewModel = viewModel(factory = factory)
             CreateListingScreen(
                 onBack = { navController.popBackStack() },
                 isOnline = isOnline,
-                onCreateListing = { _, _, _, _ ->
-                    Toast.makeText(context, "Publicación creada correctamente.", Toast.LENGTH_SHORT).show()
-                    navController.popBackStack()
-                }
+                viewModel = createListingViewModel
             )
         }
         composable(
@@ -204,10 +226,27 @@ fun AppNavigation(factory: MarketplaceViewModelFactory) {
                 val detailViewModel: ListingDetailViewModel = viewModel(factory = factory)
                 ProductDetailScreen(
                     productId = productId,
+                    isOnline = isOnline,
                     onBack = { navController.popBackStack() },
                     viewModel = detailViewModel
                 )
             }
+        }
+        composable("purchase_history") {
+            val purchaseHistoryViewModel: PurchaseHistoryViewModel = viewModel(factory = factory)
+            PurchaseHistoryScreen(
+                isOnline = isOnline,
+                onBack = { navController.popBackStack() },
+                viewModel = purchaseHistoryViewModel
+            )
+        }
+        composable("sales_history") {
+            val salesHistoryViewModel: SalesHistoryViewModel = viewModel(factory = factory)
+            SalesHistoryScreen(
+                isOnline = isOnline,
+                onBack = { navController.popBackStack() },
+                viewModel = salesHistoryViewModel
+            )
         }
     }
 }

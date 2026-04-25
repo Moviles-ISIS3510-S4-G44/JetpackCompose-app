@@ -2,6 +2,7 @@ package com.university.marketplace.map
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.university.marketplace.data.toUserFriendlyMessage
 import com.university.marketplace.domain.usecase.GetListingByIdUseCase
 import com.university.marketplace.ui.home.toUiModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -24,8 +25,22 @@ class MapViewModel(
                 val listing = getListingByIdUseCase(id)
                 _uiState.value = MapUiState.Success(listing.toUiModel())
             } catch (e: Exception) {
-                _uiState.value = MapUiState.Error(e.message ?: "No se pudo cargar la publicación")
+                _uiState.value = MapUiState.Error(
+                    e.toUserFriendlyMessage(fallback = "Failed to load listing")
+                )
             }
         }
+    }
+
+    fun showOfflineState() {
+        if (_uiState.value is MapUiState.Success) return
+        _uiState.value = MapUiState.Error(
+            "You appear to be offline. Please check your connection and try again."
+        )
+    }
+
+    fun resetToLoading() {
+        if (_uiState.value is MapUiState.Success) return
+        _uiState.value = MapUiState.Loading
     }
 }

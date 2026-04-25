@@ -19,8 +19,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -79,50 +82,36 @@ fun HomeMarketplaceScreen(
     onNavigateToProfile: () -> Unit,
     onNavigateToDetail: (String) -> Unit,
     onNavigateToSell: () -> Unit,
+    onNavigateToPurchases: () -> Unit = {},
     isOnline: Boolean,
     viewModel: HomeViewModel
 ) {
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
-    val categories = listOf("Todo", "Electrónica", "Libros", "Muebles", "Accesorios")
-    val conditions = listOf("Todos", "Nuevo", "Usado", "Reacondicionado")
-    val priceOptions = listOf<Int?>(null, 100_000, 500_000, 1_000_000)
-    val configuration = LocalConfiguration.current
-    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-    val successState = uiState as? HomeUiState.Success
-    val selectedCategory = successState?.selectedCategory ?: "Todo"
-    val selectedCondition = successState?.selectedCondition ?: "Todos"
-    val selectedPriceCap = successState?.selectedPriceCap
-    val permissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestMultiplePermissions()
-    ) {
-        viewModel.refreshUserLocation()
-    }
+    val categories by viewModel.categories.collectAsState()
+    val selectedCategoryId by viewModel.selectedCategoryId.collectAsState()
 
-    LaunchedEffect(Unit) {
-        if (hasLocationPermission(context)) {
-            viewModel.refreshUserLocation()
-        } else {
-            permissionLauncher.launch(
-                arrayOf(
-                    Manifest.permission.ACCESS_FINE_LOCATION,
-                    Manifest.permission.ACCESS_COARSE_LOCATION
-                )
-            )
+    LaunchedEffect(isOnline) {
+        val currentState = uiState
+        if (isOnline) {
+            if (currentState is HomeUiState.Loading || currentState is HomeUiState.Error) {
+                viewModel.loadListings()
+            }
+        } else if (currentState !is HomeUiState.Success) {
+            viewModel.showOfflineState()
         }
     }
 
     Scaffold(
         bottomBar = {
-            if (!isLandscape) {
-                MarketplaceBottomNavigation(
-                    currentRoute = "home",
-                    onNavigate = { route ->
-                        when (route) {
-                            "profile" -> onNavigateToProfile()
-                            "create_listing" -> onNavigateToSell()
-                        }
+            MarketplaceBottomNavigation(
+                currentRoute = "home",
+                onNavigate = { route ->
+                    when (route) {
+                        "profile" -> onNavigateToProfile()
+                        "create_listing" -> onNavigateToSell()
+                        "purchase_history" -> onNavigateToPurchases()
                     }
                 )
             }
@@ -226,23 +215,19 @@ fun HomeMarketplaceScreen(
                         }
                     }
 
-                    LazyRow(
-                        contentPadding = PaddingValues(horizontal = 16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.padding(bottom = 8.dp)
-                    ) {
-                        items(priceOptions) { cap ->
-                            val label = cap?.let { "Hasta ${String.format(Locale.US, "%,d", it).replace(',', '.')}" } ?: "Sin tope"
-                            FilterChip(
-                                selected = selectedPriceCap == cap,
-                                onClick = { viewModel.onPriceFilterSelected(cap) },
-                                label = { Text(label) },
-                                colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = MarketplaceWhite,
-                                    containerColor = Color.White.copy(alpha = 0.65f)
-                                )
-                            )
-                        }
+                // Categories
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(categories) { category ->
+                        val isSelected = selectedCategoryId == category.id
+                        SuggestionChip(
+                            onClick = { if (isOnline) viewModel.onCategorySelected(category.id) },
+                            label = { Text(category.name) },
+                            shape = RoundedCornerShape(20.dp),
+                            colors = SuggestionChipDefaults.suggestionChipColors(
+                                containerColor = if (isSelected) MarketplaceYellow else MarketplaceWhite
+                            ),
+                            border = null
+                        )
                     }
                 }
             }
@@ -259,76 +244,70 @@ fun HomeMarketplaceScreen(
                     }
                 }
                 is HomeUiState.Success -> {
-                    LazyColumn(
+                    LazyVerticalGrid(
+                        columns = GridCells.Adaptive(minSize = 160.dp),
                         modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(bottom = 16.dp)
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        if (state.isSearching) {
-                            item {
-                                Text(
-                                    text = "Resultados de búsqueda",
-                                    style = MaterialTheme.typography.titleLarge,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(16.dp)
+                        if (state.featured.isNotEmpty()) {
+                            item(span = { GridItemSpan(maxLineSpan) }) {
+                                SectionHeader(
+                                    title = if (state.isSearching) "Search Results" else "Featured",
+                                    onSeeAllClick = {}
                                 )
                             }
-                            if (state.featured.isEmpty() && state.recent.isEmpty()) {
-                                item {
-                                    Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
-                                        Text("No se encontraron productos", color = Color.Gray)
-                                    }
-                                }
-                            } else {
-                                items(state.featured + state.recent) { listing ->
-                                    SearchResultCard(listing = listing, onClick = { onNavigateToDetail(listing.id) })
-                                }
-                            }
-                        } else {
-                            // Home Sections
-                            item {
-                                SectionTitle("Basado en tu actividad")
+                            item(span = { GridItemSpan(maxLineSpan) }) {
                                 LazyRow(
-                                    contentPadding = PaddingValues(horizontal = 16.dp),
                                     horizontalArrangement = Arrangement.spacedBy(16.dp)
                                 ) {
-                                    items(state.featured.take(1)) { listing ->
-                                        ActivityProductCard(listing = listing, onClick = { onNavigateToDetail(listing.id) })
-                                    }
-                                }
-                            }
-
-                            item {
-                                SectionTitle("Destacados")
-                                LazyRow(
-                                    contentPadding = PaddingValues(horizontal = 16.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(16.dp)
-                                ) {
-                                    items(state.featured) { listing ->
-                                        FeaturedProductCard(listing = listing, onClick = { onNavigateToDetail(listing.id) })
-                                    }
-                                }
-                            }
-
-                            item { SectionTitle("Publicaciones recientes") }
-                            
-                            val columnCount = if (isLandscape) 3 else 2
-                            items(state.recent.chunked(columnCount)) { rowItems ->
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(16.dp)
-                                ) {
-                                    rowItems.forEach { listing ->
-                                        RecentProductCard(
+                                    items(
+                                        items = state.featured,
+                                        key = { it.id }
+                                    ) { listing ->
+                                        FeaturedProductCard(
                                             listing = listing,
-                                            modifier = Modifier.weight(1f),
                                             onClick = { onNavigateToDetail(listing.id) }
                                         )
                                     }
-                                    repeat(columnCount - rowItems.size) {
-                                        Spacer(Modifier.weight(1f))
-                                    }
                                 }
                             }
+
+                        if (state.recent.isNotEmpty()) {
+                            item(span = { GridItemSpan(maxLineSpan) }) {
+                                SectionHeader(
+                                    title = if (state.isSearching) "" else "Recent Listings",
+                                    onSeeAllClick = {}
+                                )
+                            }
+
+                            items(
+                                items = state.recent,
+                                key = { it.id }
+                            ) { listing ->
+                                RecentProductCard(
+                                    listing = listing,
+                                    onClick = { onNavigateToDetail(listing.id) }
+                                )
+                            }
+                        }
+
+                        if (state.featured.isEmpty() && state.recent.isEmpty()) {
+                            item(span = { GridItemSpan(maxLineSpan) }) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(32.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text("No items found")
+                                }
+                            }
+                        }
+
+                        item(span = { GridItemSpan(maxLineSpan) }) {
+                            Spacer(modifier = Modifier.height(16.dp))
                         }
                     }
                 }
@@ -338,10 +317,14 @@ fun HomeMarketplaceScreen(
 }
 
 @Composable
-fun CategoryItem(category: String, isSelected: Boolean, onClick: () -> Unit) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.clickable { onClick() }
+fun SectionHeader(title: String, onSeeAllClick: () -> Unit) {
+    if (title.isEmpty()) return
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
             text = category,
@@ -530,11 +513,11 @@ fun MarketplaceBottomNavigation(
         tonalElevation = 8.dp
     ) {
         val items = listOf(
-            BottomNavItem("Inicio", Icons.Filled.Home, Icons.Outlined.Home, route = "home"),
-            BottomNavItem("Vender", Icons.Filled.Add, Icons.Outlined.Add, route = "create_listing"),
-            BottomNavItem("Carrito", Icons.Filled.Add, Icons.Outlined.Add, route = "home"),
-            BottomNavItem("Mensajes", Icons.Filled.ChatBubble, Icons.Outlined.ChatBubbleOutline, route = "home"),
-            BottomNavItem("Perfil", Icons.Filled.Person, Icons.Outlined.PersonOutline, route = "profile")
+            BottomNavItem("Home", Icons.Filled.Home, Icons.Outlined.Home, route = "home"),
+            BottomNavItem("Purchases", Icons.Filled.Search, Icons.Outlined.Search, route = "purchase_history"),
+            BottomNavItem("Sell", Icons.Filled.Add, Icons.Outlined.Add, route = "create_listing"),
+            BottomNavItem("Messages", Icons.Filled.ChatBubble, Icons.Outlined.ChatBubbleOutline, route = "home"),
+            BottomNavItem("Profile", Icons.Filled.Person, Icons.Outlined.PersonOutline, route = "profile")
         )
 
         items.forEach { item ->

@@ -7,6 +7,22 @@ interface ListingRepository {
     fun getActiveListings(): Flow<List<Listing>>
     suspend fun refreshListings()
     suspend fun getListingById(id: String): Listing
-    suspend fun searchListings(query: String): Flow<List<Listing>>
-    suspend fun parseSearchIntent(query: String): SearchIntent?
+    suspend fun searchListings(
+        q: String? = null,
+        categoryId: String? = null,
+        condition: String? = null,
+        minPrice: Int? = null,
+        maxPrice: Int? = null
+    ): List<Listing>
+    suspend fun getMyListings(): List<Listing>
+    suspend fun createListing(
+        sellerId: String,
+        categoryId: String,
+        title: String,
+        description: String,
+        price: Int,
+        condition: String,
+        images: List<String>,
+        location: String
+    ): Listing
 }

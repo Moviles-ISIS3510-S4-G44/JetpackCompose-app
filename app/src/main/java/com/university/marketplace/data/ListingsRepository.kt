@@ -1,9 +1,6 @@
 package com.university.marketplace.data
 
-import com.university.marketplace.BuildConfig
-import com.university.marketplace.data.api.GroqApi
-import com.university.marketplace.data.api.GroqMessage
-import com.university.marketplace.data.api.GroqRequest
+import com.university.marketplace.data.api.CreateListingDto
 import com.university.marketplace.data.api.ListingsApi
 import com.university.marketplace.data.api.NetworkModule
 import com.university.marketplace.data.api.SearchIntent
@@ -35,34 +32,8 @@ class ListingsRepository(
     private val dao: ListingDao,
     private val semanticSearchEngine: SemanticSearchEngine
 ) : ListingRepository {
-
-    private val moshi = Moshi.Builder().add(KotlinJsonAdapterFactory()).build()
-    private val listType = Types.newParameterizedType(List::class.java, String::class.java)
-    private val listAdapter = moshi.adapter<List<String>>(listType)
-
-    override fun getActiveListings(): Flow<List<Listing>> {
-        return dao.getActiveListings().map { entities ->
-            entities.map { it.toDomain() }
-        }
-    }
-
-    override suspend fun refreshListings() {
-        withContext(Dispatchers.IO) {
-            try {
-                val remoteListings = api.getListings()
-                val entities = remoteListings.map { dto ->
-                    val domain = dto.toDomain()
-                    val embedding = semanticSearchEngine.getEmbedding("${domain.title} ${domain.description}")
-                    domain.toEntity(embedding)
-                }
-                dao.insertListings(entities)
-                // Evict stale entries older than 10 minutes
-                dao.deleteStaleListings(System.currentTimeMillis() - 10 * 60 * 1000)
-                dao.deleteStaleSearchCache(System.currentTimeMillis() - 10 * 60 * 1000)
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-        }
+    override suspend fun getActiveListings(): List<Listing> {
+        return api.getListings(status = "published").map { it.toDomain() }
     }
 
     override suspend fun getListingById(id: String): Listing {
@@ -243,5 +214,50 @@ class ListingsRepository(
             }
         }
         return costs[b.length]
+    }
+
+    override suspend fun searchListings(
+        q: String?,
+        categoryId: String?,
+        condition: String?,
+        minPrice: Int?,
+        maxPrice: Int?
+    ): List<Listing> {
+        return api.getListings(
+            q = q,
+            categoryId = categoryId,
+            condition = condition,
+            minPrice = minPrice,
+            maxPrice = maxPrice,
+            status = "published"
+        ).map { it.toDomain() }
+    }
+
+    override suspend fun getMyListings(): List<Listing> {
+        return api.getMyListings().map { it.toDomain() }
+    }
+
+    override suspend fun createListing(
+        sellerId: String,
+        categoryId: String,
+        title: String,
+        description: String,
+        price: Int,
+        condition: String,
+        images: List<String>,
+        location: String
+    ): Listing {
+        return api.createListing(
+            CreateListingDto(
+                sellerId = sellerId,
+                categoryId = categoryId,
+                title = title,
+                description = description,
+                price = price,
+                condition = condition,
+                images = images,
+                location = location
+            )
+        ).toDomain()
     }
 }
