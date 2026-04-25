@@ -8,6 +8,7 @@ import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import com.university.marketplace.BuildConfig
 import com.university.marketplace.data.auth.AuthApiService
 import com.university.marketplace.data.auth.AuthSessionStorage
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
@@ -15,6 +16,8 @@ import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.converter.moshi.MoshiConverterFactory
 
 object NetworkModule {
+    private const val FALLBACK_BASE_URL = "http://127.0.0.1:8000/"
+
     @Volatile
     private var initialized: Boolean = false
 
@@ -23,6 +26,7 @@ object NetworkModule {
     private lateinit var authApiInternal: AuthApiService
     private lateinit var listingsApiInternal: ListingsApi
     private lateinit var interactionsApiInternal: InteractionsApi
+    private lateinit var groqApiInternal: GroqApi
 
     val authSessionStorage: AuthSessionStorage
         get() = synchronized(this) { authSessionStorageInternal }
@@ -35,6 +39,9 @@ object NetworkModule {
 
     val interactionsApi: InteractionsApi
         get() = synchronized(this) { interactionsApiInternal }
+
+    val groqApi: GroqApi
+        get() = synchronized(this) { groqApiInternal }
 
     fun initialize(context: Context) {
         if (initialized) return
@@ -92,15 +99,28 @@ object NetworkModule {
                 .addConverterFactory(MoshiConverterFactory.create(moshi))
                 .build()
 
+            val groqRetrofit = Retrofit.Builder()
+                .baseUrl("https://api.groq.com/openai/")
+                .client(baseClient)
+                .addConverterFactory(MoshiConverterFactory.create(moshi))
+                .build()
+
             authApiInternal = authenticatedRetrofit.create(AuthApiService::class.java)
             listingsApiInternal = authenticatedMoshiRetrofit.create(ListingsApi::class.java)
             interactionsApiInternal = authenticatedRetrofit.create(InteractionsApi::class.java)
+            groqApiInternal = groqRetrofit.create(GroqApi::class.java)
 
             initialized = true
         }
     }
 
     private fun normalizeBaseUrl(baseUrl: String): String {
-        return if (baseUrl.endsWith('/')) baseUrl else "$baseUrl/"
+        val trimmed = baseUrl.trim()
+        val normalized = if (trimmed.endsWith('/')) trimmed else "$trimmed/"
+        return if (normalized.toHttpUrlOrNull() != null) {
+            normalized
+        } else {
+            FALLBACK_BASE_URL
+        }
     }
 }

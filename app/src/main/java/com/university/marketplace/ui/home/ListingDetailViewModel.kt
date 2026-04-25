@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.university.marketplace.data.InteractionsRepository
 import com.university.marketplace.data.toUserFriendlyMessage
 import com.university.marketplace.domain.usecase.GetListingByIdUseCase
+import com.university.marketplace.ui.common.toUserFriendlyMessage
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
