@@ -14,6 +14,7 @@ interface ListingRepository {
         minPrice: Int? = null,
         maxPrice: Int? = null
     ): List<Listing>
+    fun searchListingsFlow(query: String): Flow<List<Listing>>
     suspend fun getMyListings(): List<Listing>
     suspend fun createListing(
         sellerId: String,

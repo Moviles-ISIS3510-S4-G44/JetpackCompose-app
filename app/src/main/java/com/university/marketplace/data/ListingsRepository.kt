@@ -4,6 +4,9 @@ import com.university.marketplace.data.api.CreateListingDto
 import com.university.marketplace.data.api.ListingsApi
 import com.university.marketplace.data.api.NetworkModule
 import com.university.marketplace.data.api.SearchIntent
+import com.university.marketplace.data.api.GroqApi
+import com.university.marketplace.data.api.GroqRequest
+import com.university.marketplace.data.api.GroqMessage
 import com.university.marketplace.data.local.ListingDao
 import com.university.marketplace.data.local.SearchCacheEntity
 import com.university.marketplace.data.local.toDomain
@@ -25,6 +28,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
+import com.university.marketplace.BuildConfig
 
 class ListingsRepository(
     private val api: ListingsApi = NetworkModule.listingsApi,
@@ -32,15 +36,33 @@ class ListingsRepository(
     private val dao: ListingDao,
     private val semanticSearchEngine: SemanticSearchEngine
 ) : ListingRepository {
-    override suspend fun getActiveListings(): List<Listing> {
-        return api.getListings(status = "published").map { it.toDomain() }
+
+    private val moshi = Moshi.Builder()
+        .add(KotlinJsonAdapterFactory())
+        .build()
+
+    private val listAdapter = moshi.adapter<List<String>>(
+        Types.newParameterizedType(List::class.java, String::class.java)
+    )
+
+    override fun getActiveListings(): Flow<List<Listing>> {
+        return flow {
+            emit(api.getListings(status = "published").map { it.toDomain() })
+        }.flowOn(Dispatchers.IO)
+    }
+
+    override suspend fun refreshListings() {
+        withContext(Dispatchers.IO) {
+            val listings = api.getListings(status = "published")
+            dao.insertListings(listings.map { it.toDomain().toEntity() })
+        }
     }
 
     override suspend fun getListingById(id: String): Listing {
         return dao.getListingById(id)?.toDomain() ?: api.getListingById(id).toDomain()
     }
 
-    override suspend fun parseSearchIntent(query: String): SearchIntent? {
+    suspend fun parseSearchIntent(query: String): SearchIntent? {
         return withContext(Dispatchers.IO) {
             try {
                 val prompt = """
@@ -65,10 +87,13 @@ class ListingsRepository(
                 
                 val content = response.choices.firstOrNull()?.message?.content ?: return@withContext null
                 // Clean markdown if present
-                val json = content.substringAfter("```json").substringBefore("```").trim()
-                val finalJson = if (json.startsWith("{")) json else content
+                val json = if (content.contains("```json")) {
+                    content.substringAfter("```json").substringBefore("```").trim()
+                } else {
+                    content.trim()
+                }
                 
-                moshi.adapter(SearchIntent::class.java).fromJson(finalJson)
+                moshi.adapter(SearchIntent::class.java).fromJson(json)
             } catch (e: Exception) {
                 e.printStackTrace()
                 null
@@ -76,7 +101,7 @@ class ListingsRepository(
         }
     }
 
-    override suspend fun searchListings(query: String): Flow<List<Listing>> = flow {
+    override fun searchListingsFlow(query: String): Flow<List<Listing>> = flow {
         val normalizedQuery = SearchTextNormalizer.normalize(query)
         val initialQueryTokens = SearchTextNormalizer.tokenize(normalizedQuery)
 
@@ -92,8 +117,6 @@ class ListingsRepository(
             val listings = resultIds.mapNotNull { id -> dao.getListingById(id)?.toDomain() }
             if (listings.isNotEmpty()) {
                 emit(listings)
-                // Still fall through to refresh the ranking if needed, or return here for strict cache
-                // return@flow
             }
         }
 

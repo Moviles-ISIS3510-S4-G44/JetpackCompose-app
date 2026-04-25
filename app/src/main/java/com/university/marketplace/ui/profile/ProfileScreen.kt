@@ -56,6 +56,7 @@ import com.university.marketplace.domain.AuthenticatedUser
 import com.university.marketplace.ui.common.OfflineBanner
 import com.university.marketplace.ui.common.isWideScreen
 import com.university.marketplace.ui.common.rememberOfflineBannerController
+import com.university.marketplace.ui.common.toUserFriendlyMessage
 import com.university.marketplace.ui.home.ListingUiModel
 import com.university.marketplace.ui.home.MarketplaceBottomNavigation
 import com.university.marketplace.ui.theme.MarketplaceBackground

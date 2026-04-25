@@ -7,7 +7,7 @@ import kotlinx.coroutines.flow.Flow
 class SearchListingsByRelevanceUseCase(
     private val repository: ListingRepository
 ) {
-    suspend fun execute(query: String): Flow<List<Listing>> {
-        return repository.searchListings(query)
+    fun execute(query: String): Flow<List<Listing>> {
+        return repository.searchListingsFlow(query)
     }
 }

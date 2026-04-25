@@ -1,6 +1,7 @@
 package com.university.marketplace.ui.home
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -21,10 +22,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.listSaver
@@ -52,6 +49,7 @@ private val UserCoordinatesSaver = listSaver<Pair<Double, Double>?, Double>(
     restore = { list -> if (list.size == 2) list[0] to list[1] else null }
 )
 
+@SuppressLint("MissingPermission")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProductDetailScreen(
@@ -70,6 +68,18 @@ fun ProductDetailScreen(
     }
     var showPurchaseDialog by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        if (permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
+            permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+        ) {
+            fusedLocationClient.lastLocation.addOnSuccessListener { location ->
+                location?.let { userCoordinates = it.latitude to it.longitude }
+            }
+        }
+    }
 
     LaunchedEffect(purchaseState) {
         when (val ps = purchaseState) {
@@ -109,7 +119,9 @@ fun ProductDetailScreen(
         ) == PackageManager.PERMISSION_GRANTED
 
         if (hasFineLocation || hasCoarseLocation) {
-            updateLocation()
+            fusedLocationClient.lastLocation.addOnSuccessListener { location ->
+                location?.let { userCoordinates = it.latitude to it.longitude }
+            }
         } else {
             permissionLauncher.launch(
                 arrayOf(
@@ -126,7 +138,7 @@ fun ProductDetailScreen(
             onDismissRequest = { showPurchaseDialog = false },
             title = { Text("Confirm Purchase") },
             text = {
-                Text("Buy \"${listing?.name ?: "this item"}\" for $${listing?.price?.toInt()}?")
+                Text("Buy \"\${listing?.name ?: \"this item\"}\" for $\${listing?.price?.toInt()}?")
             },
             confirmButton = {
                 TextButton(onClick = {
@@ -242,9 +254,9 @@ fun ProductDetailScreen(
                                     listing.longitude
                                 )
                                 String.format(Locale.US, "%s • %.1f km away", listing.locationName, distanceKm)
-                            } ?: "${listing.locationName} • distance unavailable"
+                            } ?: "\${listing.locationName} • distance unavailable"
                         } else {
-                            "${listing.locationName} • location unavailable"
+                            "\${listing.locationName} • location unavailable"
                         }
                     }
                     if (isWideScreen()) {
@@ -343,7 +355,7 @@ private fun ListingDetailBody(
         }
 
         Text(
-            text = "$${listing.price.toInt()}",
+            text = "$\${listing.price.toInt()}",
             color = MarketplaceYellow,
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.ExtraBold,

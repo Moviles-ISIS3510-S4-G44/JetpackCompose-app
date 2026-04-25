@@ -98,6 +98,16 @@ fun AppNavigation(container: com.university.marketplace.di.AppContainer) {
         }
     }
 
+    val navigateToTopLevel: (String) -> Unit = { route ->
+        navController.navigate(route) {
+            popUpTo(navController.graph.startDestinationId) {
+                saveState = true
+            }
+            launchSingleTop = true
+            restoreState = true
+        }
+    }
+
     var lastNotifiedOnline by rememberSaveable { mutableStateOf<Boolean?>(null) }
     LaunchedEffect(isOnline) {
         val previous = lastNotifiedOnline
@@ -110,7 +120,7 @@ fun AppNavigation(container: com.university.marketplace.di.AppContainer) {
     NavHost(navController = navController, startDestination = startDestination) {
         composable("sign_in") {
             val authViewModel = viewModel<AuthViewModel>(
-                factory = AuthViewModelFactory(authRepository)
+                factory = AuthViewModelFactory(authRepository, container.locationRepository)
             )
             SignInScreen(
                 isOnline = isOnline,
@@ -128,7 +138,7 @@ fun AppNavigation(container: com.university.marketplace.di.AppContainer) {
         }
         composable("sign_up") {
             val authViewModel = viewModel<AuthViewModel>(
-                factory = AuthViewModelFactory(authRepository)
+                factory = AuthViewModelFactory(authRepository, container.locationRepository)
             )
             SignUpScreen(
                 isOnline = isOnline,
@@ -277,37 +287,30 @@ fun AppNavigation(container: com.university.marketplace.di.AppContainer) {
                 isOnline = isOnline,
                 onBack = { navController.popBackStack() },
                 onNavigateToChat = { conversationId, otherUserName ->
-                    navController.navigate(
-                        "chat/$conversationId?name=${android.net.Uri.encode(otherUserName)}"
-                    )
+                    navController.navigate("chat/$conversationId?name=${android.net.Uri.encode(otherUserName)}")
                 },
                 viewModel = conversationListViewModel
             )
         }
         composable(
-            route = "chat/{conversationId}?name={otherUserName}",
+            route = "chat/{conversationId}?name={name}",
             arguments = listOf(
                 navArgument("conversationId") { type = NavType.StringType },
-                navArgument("otherUserName") {
-                    type = NavType.StringType
-                    defaultValue = "Chat"
-                }
+                navArgument("name") { type = NavType.StringType }
             )
         ) { backStackEntry ->
-            val conversationId = backStackEntry.arguments?.getString("conversationId") ?: return@composable
-            val otherUserName = backStackEntry.arguments?.getString("otherUserName") ?: "Chat"
-            val token = remember { NetworkModule.authSessionStorage.getAccessToken().orEmpty() }
-            val currentUserId = remember { NetworkModule.authSessionStorage.getCurrentUserId().orEmpty() }
-            val chatVmFactory = remember(conversationId) {
-                ChatViewModelFactory(
+            val conversationId = backStackEntry.arguments?.getString("conversationId") ?: ""
+            val otherUserName = backStackEntry.arguments?.getString("name") ?: ""
+            
+            val chatViewModel: ChatViewModel = viewModel(
+                factory = ChatViewModelFactory(
                     chatRepository = container.chatRepository,
                     wsClient = NetworkModule.createChatWebSocketClient(),
                     conversationId = conversationId,
-                    token = token,
-                    currentUserId = currentUserId
+                    token = NetworkModule.authSessionStorage.getAccessToken() ?: "",
+                    currentUserId = NetworkModule.authSessionStorage.getCurrentUserId() ?: ""
                 )
-            }
-            val chatViewModel: ChatViewModel = viewModel(factory = chatVmFactory)
+            )
             ChatScreen(
                 otherUserName = otherUserName,
                 onBack = { navController.popBackStack() },

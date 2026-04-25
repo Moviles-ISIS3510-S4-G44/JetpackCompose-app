@@ -10,24 +10,23 @@ import com.university.marketplace.domain.Listing
 import com.university.marketplace.domain.usecase.GetActiveListingsUseCase
 import com.university.marketplace.domain.usecase.GetFilteredListingsUseCase
 import com.university.marketplace.domain.usecase.SearchListingsByRelevanceUseCase
+import com.university.marketplace.data.location.LocationRepository
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.launch
-import java.util.Locale
-import kotlin.math.max
 
 class HomeViewModel(
     private val getActiveListingsUseCase: GetActiveListingsUseCase,
     private val searchListingsByRelevanceUseCase: SearchListingsByRelevanceUseCase,
     private val getFilteredListingsUseCase: GetFilteredListingsUseCase,
-    private val categoryRepository: CategoryRepository
+    private val categoryRepository: CategoryRepository,
+    private val locationRepository: LocationRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<HomeUiState>(HomeUiState.Loading)
@@ -44,9 +43,11 @@ class HomeViewModel(
 
     private var allListings: List<Listing> = emptyList()
     private var searchJob: Job? = null
+    private var userLocation: Location? = null
 
     init {
         loadCategories()
+        observeListings()
     }
 
     private fun loadCategories() {
@@ -75,34 +76,6 @@ class HomeViewModel(
         viewModelScope.launch {
             getActiveListingsUseCase().collectLatest { listings ->
                 allListings = listings
-                if (_searchQuery.value.isEmpty()) currentSearchResults = null
-                applyFiltersAndPublish()
-            }
-        }
-    }
-
-    @OptIn(FlowPreview::class)
-    private fun observeSearch() {
-        viewModelScope.launch {
-            _searchQuery
-                .debounce(500)
-                .distinctUntilChanged()
-                .collectLatest { query ->
-                    if (query.isNotEmpty()) {
-                        executeSearch(query)
-                    } else {
-                        currentSearchResults = null
-                        applyFiltersAndPublish()
-                    }
-                }
-        }
-    }
-
-    private fun executeSearch(query: String) {
-        searchJob?.cancel()
-        searchJob = viewModelScope.launch {
-            searchListingsByRelevanceUseCase.execute(query).collectLatest { results ->
-                currentSearchResults = results
                 applyFiltersAndPublish()
             }
         }
@@ -110,15 +83,7 @@ class HomeViewModel(
 
     fun loadListings() {
         viewModelScope.launch {
-            _uiState.value = HomeUiState.Loading
-            try {
-                allListings = getActiveListingsUseCase()
-                updateSections(allListings.map { it.toUiModel() })
-            } catch (e: Exception) {
-                _uiState.value = HomeUiState.Error(
-                    e.toUserFriendlyMessage(fallback = "An unknown error occurred")
-                )
-            }
+            getActiveListingsUseCase.refresh()
         }
     }
 
@@ -127,6 +92,14 @@ class HomeViewModel(
         _uiState.value = HomeUiState.Error(
             "You appear to be offline. Please check your connection and try again."
         )
+    }
+
+    private fun applyFiltersAndPublish() {
+        val filtered = allListings.filter { listing ->
+            val matchesCategory = _selectedCategoryId.value == null || listing.categoryId == _selectedCategoryId.value
+            matchesCategory
+        }
+        updateSections(filtered.map { it.toUiModel() })
     }
 
     private fun updateSections(listings: List<ListingUiModel>) {
@@ -142,39 +115,21 @@ class HomeViewModel(
 
     fun onSearchQueryChanged(query: String) {
         _searchQuery.value = query
-        if (query.isEmpty() && _selectedCategoryId.value == null) {
-            updateSections(allListings.map { it.toUiModel() })
-            return
-        }
         searchJob?.cancel()
         searchJob = viewModelScope.launch {
-            delay(300)
-            fetchFiltered()
+            delay(500)
+            if (query.isNotEmpty()) {
+                searchListingsByRelevanceUseCase.execute(query).collectLatest { results ->
+                    updateSections(results.map { it.toUiModel() })
+                }
+            } else {
+                applyFiltersAndPublish()
+            }
         }
     }
 
     fun onCategorySelected(categoryId: String?) {
         _selectedCategoryId.value = if (_selectedCategoryId.value == categoryId) null else categoryId
-        searchJob?.cancel()
-        searchJob = viewModelScope.launch {
-            fetchFiltered()
-        }
-    }
-
-    private suspend fun fetchFiltered() {
-        val q = _searchQuery.value.takeIf { it.isNotEmpty() }
-        val catId = _selectedCategoryId.value
-        if (q == null && catId == null) {
-            updateSections(allListings.map { it.toUiModel() })
-            return
-        }
-        try {
-            val results = getFilteredListingsUseCase(q = q, categoryId = catId)
-            updateSections(results.map { it.toUiModel() })
-        } catch (e: Exception) {
-            _uiState.value = HomeUiState.Error(
-                e.toUserFriendlyMessage(fallback = "Search failed")
-            )
-        }
+        applyFiltersAndPublish()
     }
 }

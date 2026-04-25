@@ -1,5 +1,6 @@
 package com.university.marketplace.di
 
+import android.content.Context
 import com.university.marketplace.data.CategoriesRepository
 import com.university.marketplace.data.ChatRepositoryImpl
 import com.university.marketplace.data.DefaultInteractionsRepository
@@ -8,6 +9,10 @@ import com.university.marketplace.data.ListingsRepository
 import com.university.marketplace.data.PurchasesRepository
 import com.university.marketplace.data.api.NetworkModule
 import com.university.marketplace.data.auth.AuthRepository
+import com.university.marketplace.data.local.AppDatabase
+import com.university.marketplace.data.location.AndroidLocationRepository
+import com.university.marketplace.data.location.LocationRepository
+import com.university.marketplace.data.search.SemanticSearchEngine
 import com.university.marketplace.domain.CategoryRepository
 import com.university.marketplace.domain.ChatRepository
 import com.university.marketplace.domain.ListingRepository
@@ -28,6 +33,7 @@ interface AppContainer {
     val purchaseRepository: PurchaseRepository
     val interactionsRepository: InteractionsRepository
     val chatRepository: ChatRepository
+    val locationRepository: LocationRepository
     val getActiveListingsUseCase: GetActiveListingsUseCase
     val getListingByIdUseCase: GetListingByIdUseCase
     val searchListingsByRelevanceUseCase: SearchListingsByRelevanceUseCase

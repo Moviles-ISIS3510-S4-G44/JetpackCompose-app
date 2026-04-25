@@ -1,50 +1,21 @@
 package com.university.marketplace.map
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxScope
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.SignalWifiOff
 import androidx.compose.material.icons.filled.Star
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -57,25 +28,13 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import coil.compose.AsyncImage
 import com.google.android.gms.location.LocationServices
-import com.google.android.gms.maps.CameraUpdateFactory
-import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
-import com.google.android.gms.maps.model.LatLngBounds
-import com.google.maps.android.compose.GoogleMap
-import com.google.maps.android.compose.MapUiSettings
-import com.google.maps.android.compose.Marker
-import com.google.maps.android.compose.rememberCameraPositionState
-import com.google.maps.android.compose.rememberMarkerState
+import com.google.maps.android.compose.*
 import com.university.marketplace.ui.common.OfflineBanner
 import com.university.marketplace.ui.common.isWideScreen
 import com.university.marketplace.ui.common.rememberOfflineBannerController
-import com.university.marketplace.ui.theme.MarketplaceBackground
-import com.university.marketplace.ui.theme.MarketplaceDark
-import com.university.marketplace.ui.theme.MarketplaceDarkSecondary
-import com.university.marketplace.ui.theme.MarketplaceGray
-import com.university.marketplace.ui.theme.MarketplaceWhite
-import com.university.marketplace.ui.theme.MarketplaceYellow
+import com.university.marketplace.ui.theme.*
 import java.util.Locale
 
 private val DEFAULT_MAP_CENTER = LatLng(4.601, -74.065)
@@ -85,6 +44,7 @@ private val LatLngSaver = listSaver<LatLng?, Double>(
     restore = { list -> if (list.size == 2) LatLng(list[0], list[1]) else null }
 )
 
+@SuppressLint("MissingPermission")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MapViewScreen(
@@ -101,6 +61,18 @@ fun MapViewScreen(
     val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
     var userLocation by rememberSaveable(stateSaver = LatLngSaver) {
         mutableStateOf<LatLng?>(null)
+    }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        if (permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
+            permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+        ) {
+            fusedLocationClient.lastLocation.addOnSuccessListener { location ->
+                location?.let { userLocation = LatLng(it.latitude, it.longitude) }
+            }
+        }
     }
 
     LaunchedEffect(productId, isOnline) {
@@ -127,7 +99,9 @@ fun MapViewScreen(
         ) == PackageManager.PERMISSION_GRANTED
 
         if (hasFineLocation || hasCoarseLocation) {
-            updateUserLocation()
+            fusedLocationClient.lastLocation.addOnSuccessListener { location ->
+                location?.let { userLocation = LatLng(it.latitude, it.longitude) }
+            }
         } else {
             permissionLauncher.launch(
                 arrayOf(
@@ -199,17 +173,17 @@ fun MapViewScreen(
                         val distanceText = remember(userLocation, listingLocation) {
                             userLocation?.let { current ->
                                 listingLocation?.let {
-                                    val distanceKm = DistanceUtils.calculateDistance(
-                                        current.latitude,
-                                        current.longitude,
-                                        it.latitude,
-                                        it.longitude
+                                    val results = FloatArray(1)
+                                    android.location.Location.distanceBetween(
+                                        current.latitude, current.longitude,
+                                        it.latitude, it.longitude,
+                                        results
                                     )
+                                    val distanceKm = results[0] / 1000
                                     String.format(Locale.US, "Approx. %.1f km from you", distanceKm)
                                 }
                             } ?: "Location unavailable"
                         }
-                        var isMapLoaded by remember(listing.id) { mutableStateOf(false) }
 
                         val cameraPositionState = rememberCameraPositionState {
                             position = CameraPosition.fromLatLngZoom(
@@ -256,7 +230,11 @@ fun MapViewScreen(
                                 modifier = Modifier.fillMaxSize()
                             )
 
-                            BottomCardWrapper {
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.BottomCenter)
+                                    .padding(16.dp)
+                            ) {
                                 ListingSummaryCard(
                                     listing = listing,
                                     distanceText = distanceText,
@@ -272,19 +250,8 @@ fun MapViewScreen(
 }
 
 @Composable
-private fun BoxScope.BottomCardWrapper(content: @Composable () -> Unit) {
-    Box(
-        modifier = Modifier
-            .align(Alignment.BottomCenter)
-            .padding(16.dp)
-    ) {
-        content()
-    }
-}
-
-@Composable
 private fun MapContent(
-    cameraPositionState: com.google.maps.android.compose.CameraPositionState,
+    cameraPositionState: CameraPositionState,
     listingLocation: LatLng?,
     userLocation: LatLng?,
     listing: com.university.marketplace.ui.home.ListingUiModel,
