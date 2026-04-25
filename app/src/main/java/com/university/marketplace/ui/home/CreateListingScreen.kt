@@ -24,6 +24,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
 import coil.compose.AsyncImage
 import com.university.marketplace.ui.common.isWideScreen
 import com.university.marketplace.ui.theme.*
@@ -75,10 +76,10 @@ fun CreateListingScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text("Create New Listing", fontWeight = FontWeight.Bold, fontSize = 18.sp) },
+                title = { Text("Crear publicación", fontWeight = FontWeight.Bold, fontSize = 18.sp) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.Close, contentDescription = "Close")
+                        Icon(Icons.Default.Close, contentDescription = "Cerrar")
                     }
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = MarketplaceWhite)
@@ -378,7 +379,7 @@ fun MarketplaceTextField(
 
 @Composable
 fun ConditionToggleGroup(selectedCondition: String, onConditionSelected: (String) -> Unit) {
-    val options = listOf("New", "Like New", "Used")
+    val options = listOf("Nuevo", "Como nuevo", "Usado")
     Row(
         modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Color(0xFFF1F1F1))
     ) {

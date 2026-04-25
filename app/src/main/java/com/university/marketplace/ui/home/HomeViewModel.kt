@@ -1,5 +1,6 @@
 package com.university.marketplace.ui.home
 
+import android.location.Location
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.university.marketplace.data.toUserFriendlyMessage
@@ -14,7 +15,13 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import java.util.Locale
+import kotlin.math.max
 
 class HomeViewModel(
     private val getActiveListingsUseCase: GetActiveListingsUseCase,
@@ -45,6 +52,59 @@ class HomeViewModel(
     private fun loadCategories() {
         viewModelScope.launch {
             runCatching { _categories.value = categoryRepository.getCategories() }
+        }
+    }
+
+    fun refreshUserLocation() {
+        fetchUserLocation()
+    }
+
+    private fun fetchUserLocation() {
+        viewModelScope.launch {
+            locationRepository.getLastKnownLocation()?.let {
+                userLocation = Location("gps").apply {
+                    latitude = it.latitude
+                    longitude = it.longitude
+                }
+                applyFiltersAndPublish()
+            }
+        }
+    }
+
+    private fun observeListings() {
+        viewModelScope.launch {
+            getActiveListingsUseCase().collectLatest { listings ->
+                allListings = listings
+                if (_searchQuery.value.isEmpty()) currentSearchResults = null
+                applyFiltersAndPublish()
+            }
+        }
+    }
+
+    @OptIn(FlowPreview::class)
+    private fun observeSearch() {
+        viewModelScope.launch {
+            _searchQuery
+                .debounce(500)
+                .distinctUntilChanged()
+                .collectLatest { query ->
+                    if (query.isNotEmpty()) {
+                        executeSearch(query)
+                    } else {
+                        currentSearchResults = null
+                        applyFiltersAndPublish()
+                    }
+                }
+        }
+    }
+
+    private fun executeSearch(query: String) {
+        searchJob?.cancel()
+        searchJob = viewModelScope.launch {
+            searchListingsByRelevanceUseCase.execute(query).collectLatest { results ->
+                currentSearchResults = results
+                applyFiltersAndPublish()
+            }
         }
     }
 
