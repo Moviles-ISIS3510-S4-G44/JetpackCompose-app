@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.supervisorScope
 
 data class AuthUiState(
     val isLoading: Boolean = false,
@@ -35,23 +36,18 @@ class AuthViewModel(
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, errorMessage = null, authenticatedUser = null) }
 
-
             try {
+                val (user, location) = supervisorScope {
+                    val authDeferred = async(Dispatchers.IO) {
+                        repository.login(email, password, persistSession)
+                    }
 
-                val authDeferred = async(Dispatchers.IO) {
+                    val locationDeferred = async(Dispatchers.IO) {
+                        locationRepository.getLastKnownLocation()
+                    }
 
-                    repository.login(email, password, persistSession)
+                    authDeferred.await() to locationDeferred.await()
                 }
-
-                val locationDeferred = async(Dispatchers.IO) {
-
-                    locationRepository.getLastKnownLocation()
-                }
-
-                val user = authDeferred.await()
-                val location = locationDeferred.await()
-
-
 
                 Log.d("AuthStrategy", "Login: ${user.email} | Ubicación: $location")
 
@@ -67,17 +63,17 @@ class AuthViewModel(
             _uiState.update { it.copy(isLoading = true, errorMessage = null, authenticatedUser = null) }
 
             try {
+                val (user, location) = supervisorScope {
+                    val authDeferred = async(Dispatchers.IO) {
+                        repository.signup(name, email, password, persistSession)
+                    }
 
-                val authDeferred = async(Dispatchers.IO) {
-                    repository.signup(name, email, password, persistSession)
+                    val locationDeferred = async(Dispatchers.IO) {
+                        locationRepository.getLastKnownLocation()
+                    }
+
+                    authDeferred.await() to locationDeferred.await()
                 }
-
-                val locationDeferred = async(Dispatchers.IO) {
-                    locationRepository.getLastKnownLocation()
-                }
-
-                val user = authDeferred.await()
-                val location = locationDeferred.await()
 
                 Log.d("AuthStrategy", "Registro: ${user.email} | Ubicación: $location")
 
