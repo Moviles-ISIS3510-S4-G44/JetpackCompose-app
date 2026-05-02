@@ -5,10 +5,12 @@ import android.util.Log
 import com.university.marketplace.data.api.NetworkModule
 import com.university.marketplace.domain.AuthenticatedUser
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
 interface AuthRepository {
+    val sessionFlow: Flow<AuthSession?>
     suspend fun login(email: String, password: String, persistSession: Boolean): AuthenticatedUser
     suspend fun signup(name: String, email: String, password: String, persistSession: Boolean): AuthenticatedUser
     suspend fun getCurrentUser(): AuthenticatedUser
@@ -22,6 +24,8 @@ class DefaultAuthRepository(
     private val apiService: AuthApiService,
     private val sessionStorage: AuthSessionStorage
 ) : AuthRepository {
+    override val sessionFlow: Flow<AuthSession?> = sessionStorage.sessionFlow
+
     override suspend fun login(
         email: String,
         password: String,
