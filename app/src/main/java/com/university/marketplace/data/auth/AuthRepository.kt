@@ -182,7 +182,7 @@ class DefaultAuthRepository(
     private fun buildAuthException(
         statusCode: Int,
         errorBody: String?,
-        unauthorizedMessage: String = "We could not complete the request. Please try again."
+        unauthorizedMessage: String = "invalid credentials"
     ): AuthException {
         val apiMessage: String? = errorBody?.let { body ->
             runCatching { JSONObject(body).optString("detail").takeIf { it.isNotBlank() } }.getOrNull()

@@ -22,6 +22,7 @@ import kotlinx.coroutines.supervisorScope
 data class AuthUiState(
     val isLoading: Boolean = false,
     val errorMessage: String? = null,
+    val isInvalidCredentials: Boolean = false,
     val authenticatedUser: AuthenticatedUser? = null
 )
 
@@ -34,7 +35,7 @@ class AuthViewModel(
 
     fun signIn(email: String, password: String, persistSession: Boolean) {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, errorMessage = null, authenticatedUser = null) }
+            _uiState.update { it.copy(isLoading = true, errorMessage = null, isInvalidCredentials = false, authenticatedUser = null) }
 
             try {
                 val (user, location) = supervisorScope {
@@ -53,14 +54,21 @@ class AuthViewModel(
 
                 _uiState.update { it.copy(isLoading = false, authenticatedUser = user) }
             } catch (throwable: Throwable) {
-                _uiState.update { it.copy(isLoading = false, errorMessage = throwable.toUserMessage()) }
+                val message = throwable.toUserMessage()
+                _uiState.update { 
+                    it.copy(
+                        isLoading = false, 
+                        errorMessage = message,
+                        isInvalidCredentials = message == INVALID_CREDENTIALS_ERROR
+                    ) 
+                }
             }
         }
     }
 
     fun signUp(name: String, email: String, password: String, persistSession: Boolean) {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, errorMessage = null, authenticatedUser = null) }
+            _uiState.update { it.copy(isLoading = true, errorMessage = null, isInvalidCredentials = false, authenticatedUser = null) }
 
             try {
                 val (user, location) = supervisorScope {
@@ -79,13 +87,20 @@ class AuthViewModel(
 
                 _uiState.update { it.copy(isLoading = false, authenticatedUser = user) }
             } catch (throwable: Throwable) {
-                _uiState.update { it.copy(isLoading = false, errorMessage = throwable.toUserMessage()) }
+                val message = throwable.toUserMessage()
+                _uiState.update { 
+                    it.copy(
+                        isLoading = false, 
+                        errorMessage = message,
+                        isInvalidCredentials = message == INVALID_CREDENTIALS_ERROR
+                    ) 
+                }
             }
         }
     }
 
     fun clearError() {
-        _uiState.update { it.copy(errorMessage = null) }
+        _uiState.update { it.copy(errorMessage = null, isInvalidCredentials = false) }
     }
 
     fun consumeAuthentication() {
@@ -106,11 +121,20 @@ class AuthViewModel(
     private fun String?.toFriendlyAuthMessage(): String {
         val value = this.orEmpty().lowercase()
         return when {
-            value.contains("invalid credentials") -> "Correo o contraseña incorrectos."
-            value.contains("already registered") -> "Este correo ya tiene una cuenta registrada."
-            value.contains("session has expired") -> "Tu sesión expiró. Inicia sesión nuevamente."
+            value.contains("invalid") || 
+            value.contains("credentials") || 
+            value.contains("incorrect") || 
+            value.contains("password") || 
+            value.contains("user not found") ||
+            value.contains("unauthorized") -> INVALID_CREDENTIALS_ERROR
+            value.contains("already registered") || value.contains("409") -> "Este correo ya tiene una cuenta registrada."
+            value.contains("expired") || value.contains("session") -> "Tu sesión expiró. Inicia sesión nuevamente."
             else -> "No pudimos completar la solicitud. Intenta nuevamente."
         }
+    }
+
+    companion object {
+        const val INVALID_CREDENTIALS_ERROR = "Correo o contraseña incorrectos."
     }
 }
 
