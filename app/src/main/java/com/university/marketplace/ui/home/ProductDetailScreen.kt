@@ -105,8 +105,8 @@ fun ProductDetailScreen(
     }
 
     LaunchedEffect(productId, isOnline) {
-        val currentState = uiState
-        if (currentState is ListingDetailUiState.Success) return@LaunchedEffect
+        val currentState = uiState.content
+        if (currentState is ListingDetailUiState.Content.Success) return@LaunchedEffect
         if (!isOnline) {
             viewModel.showOfflineState()
             return@LaunchedEffect
@@ -142,7 +142,7 @@ fun ProductDetailScreen(
     }
 
     if (showPurchaseDialog) {
-        val listing = (uiState as? ListingDetailUiState.Success)?.listing
+        val listing = (uiState.content as? ListingDetailUiState.Content.Success)?.listing
         AlertDialog(
             onDismissRequest = { showPurchaseDialog = false },
             title = { Text("Confirm Purchase") },
@@ -173,13 +173,19 @@ fun ProductDetailScreen(
                 },
                 actions = {
                     IconButton(onClick = { /* Compartir */ }) { Icon(Icons.Outlined.Share, null) }
-                    IconButton(onClick = { /* Favoritos */ }) { Icon(Icons.Outlined.FavoriteBorder, null) }
+                    IconButton(onClick = { viewModel.toggleFavorite(productId) }) {
+                        Icon(
+                            imageVector = if (uiState.isFavorited) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                            contentDescription = "Toggle Favorite",
+                            tint = if (uiState.isFavorited) Color.Red else LocalContentColor.current
+                        )
+                    }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White)
             )
         },
         bottomBar = {
-            if (uiState is ListingDetailUiState.Success) {
+            if (uiState.content is ListingDetailUiState.Content.Success) {
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
                     tonalElevation = 8.dp,
@@ -244,14 +250,14 @@ fun ProductDetailScreen(
         }
     ) { padding ->
         Box(modifier = Modifier.padding(padding).fillMaxSize()) {
-            when (val state = uiState) {
-                is ListingDetailUiState.Loading -> {
+            when (val state = uiState.content) {
+                is ListingDetailUiState.Content.Loading -> {
                     CircularProgressIndicator(modifier = Modifier.align(Alignment.Center), color = MarketplaceYellow)
                 }
-                is ListingDetailUiState.Error -> {
+                is ListingDetailUiState.Content.Error -> {
                     Text(text = state.message, color = Color.Red, modifier = Modifier.align(Alignment.Center))
                 }
-                is ListingDetailUiState.Success -> {
+                is ListingDetailUiState.Content.Success -> {
                     val listing = state.listing
                     val distanceText = remember(listing, userCoordinates) {
                         if (listing.latitude != null && listing.longitude != null) {

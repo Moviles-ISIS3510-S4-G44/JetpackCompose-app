@@ -66,7 +66,12 @@ class ListingsRepository(
     }
 
     override suspend fun getListingById(id: String): Listing {
-        return dao.getListingById(id)?.toDomain() ?: api.getListingById(id).toDomain()
+        val local = dao.getListingById(id)
+        if (local != null) return local.toDomain()
+        
+        val remote = api.getListingById(id).toDomain()
+        saveListing(remote) // Cache it locally
+        return remote
     }
 
     override suspend fun searchListings(query: String): Flow<List<Listing>> {
@@ -181,7 +186,7 @@ class ListingsRepository(
         images: List<String>,
         location: String
     ): Listing {
-        return api.createListing(
+        val listing = api.createListing(
             CreateListingDto(
                 sellerId = sellerId,
                 categoryId = categoryId,
@@ -193,6 +198,15 @@ class ListingsRepository(
                 location = location
             )
         ).toDomain()
+        saveListing(listing)
+        return listing
+    }
+
+    override suspend fun saveListing(listing: Listing) {
+        withContext(Dispatchers.IO) {
+            val embedding = semanticSearchEngine.getEmbedding("\${listing.title} \${listing.description}")
+            dao.insertListings(listOf(listing.toEntity(embedding)))
+        }
     }
 
     private suspend fun parseSearchIntent(query: String): SearchIntent? {

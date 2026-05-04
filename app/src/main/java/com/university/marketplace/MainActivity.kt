@@ -52,6 +52,8 @@ import com.university.marketplace.ui.home.CreateListingViewModel
 import com.university.marketplace.ui.home.HomeViewModel
 import com.university.marketplace.ui.home.ListingDetailViewModel
 import com.university.marketplace.ui.home.ProductDetailScreen
+import com.university.marketplace.ui.favorites.FavoritesScreen
+import com.university.marketplace.ui.favorites.FavoritesViewModel
 import com.university.marketplace.ui.profile.MyListingsViewModel
 import com.university.marketplace.ui.profile.ProfileRoute
 import com.university.marketplace.data.api.NetworkModule
@@ -211,6 +213,9 @@ fun AppNavigation(container: com.university.marketplace.di.AppContainer) {
                 onNavigateToMessages = {
                     navController.navigate("conversations")
                 },
+                onNavigateToFavorites = {
+                    navController.navigate("favorites")
+                },
                 isOnline = isOnline
             )
         }
@@ -288,6 +293,14 @@ fun AppNavigation(container: com.university.marketplace.di.AppContainer) {
                     viewModel = detailViewModel
                 )
             }
+        }
+        composable("favorites") {
+            val favoritesViewModel: FavoritesViewModel = viewModel(factory = factory)
+            FavoritesScreen(
+                onBack = { navController.popBackStack() },
+                onProductClick = { id -> navController.navigate("product_detail/$id") },
+                viewModel = favoritesViewModel
+            )
         }
         composable("purchase_history") {
             val purchaseHistoryViewModel: PurchaseHistoryViewModel = viewModel(factory = factory)

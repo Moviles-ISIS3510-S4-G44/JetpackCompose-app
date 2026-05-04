@@ -26,6 +26,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ChatBubble
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
@@ -81,6 +82,7 @@ fun HomeMarketplaceScreen(
     onNavigateToSell: () -> Unit,
     onNavigateToPurchases: () -> Unit = {},
     onNavigateToMessages: () -> Unit = {},
+    onNavigateToFavorites: () -> Unit = {},
     isOnline: Boolean,
     viewModel: HomeViewModel
 ) {
@@ -157,7 +159,8 @@ fun HomeMarketplaceScreen(
                 selectedPriceCap = selectedPriceCap,
                 onQueryChanged = viewModel::onSearchQueryChanged,
                 onCategorySelected = viewModel::onCategorySelected,
-                onPriceSelected = viewModel::onPriceCapSelected
+                onPriceSelected = viewModel::onPriceCapSelected,
+                onNavigateToFavorites = onNavigateToFavorites
             )
 
             when (val state = uiState) {
@@ -233,7 +236,8 @@ private fun SearchHeader(
     selectedPriceCap: Int?,
     onQueryChanged: (String) -> Unit,
     onCategorySelected: (String?) -> Unit,
-    onPriceSelected: (Int?) -> Unit
+    onPriceSelected: (Int?) -> Unit,
+    onNavigateToFavorites: () -> Unit
 ) {
     val priceOptions = listOf<Int?>(null, 100_000, 300_000, 500_000, 1_000_000)
 
@@ -282,6 +286,9 @@ private fun SearchHeader(
                 enabled = isOnline
             )
             Spacer(modifier = Modifier.width(8.dp))
+            IconButton(onClick = onNavigateToFavorites, modifier = Modifier.size(48.dp)) {
+                Icon(Icons.Default.Favorite, contentDescription = "Favoritos", tint = MarketplaceDark)
+            }
             IconButton(onClick = { }, modifier = Modifier.size(48.dp)) {
                 Icon(Icons.Default.Notifications, contentDescription = "Notificaciones", tint = MarketplaceDark)
             }

@@ -5,6 +5,7 @@ import com.university.marketplace.data.CategoriesRepository
 import com.university.marketplace.data.ChatRepositoryImpl
 import com.university.marketplace.data.DefaultInteractionsRepository
 import com.university.marketplace.data.InteractionsRepository
+import com.university.marketplace.data.FavoriteRepositoryImpl
 import com.university.marketplace.data.ListingsRepository
 import com.university.marketplace.data.PurchasesRepository
 import com.university.marketplace.data.api.NetworkModule
@@ -15,6 +16,7 @@ import com.university.marketplace.data.location.LocationRepository
 import com.university.marketplace.data.search.SemanticSearchEngine
 import com.university.marketplace.domain.CategoryRepository
 import com.university.marketplace.domain.ChatRepository
+import com.university.marketplace.domain.FavoriteRepository
 import com.university.marketplace.domain.ListingRepository
 import com.university.marketplace.domain.PurchaseRepository
 import com.university.marketplace.domain.usecase.CreatePurchaseUseCase
@@ -29,6 +31,7 @@ import com.university.marketplace.domain.usecase.SearchListingsByRelevanceUseCas
 
 interface AppContainer {
     val listingRepository: ListingRepository
+    val favoriteRepository: FavoriteRepository
     val categoryRepository: CategoryRepository
     val purchaseRepository: PurchaseRepository
     val interactionsRepository: InteractionsRepository
@@ -65,6 +68,16 @@ class DefaultAppContainer(context: Context) : AppContainer {
             groqApi = NetworkModule.groqApi,
             dao = database.listingDao(),
             semanticSearchEngine = semanticSearchEngine
+        )
+    }
+
+    override val favoriteRepository: FavoriteRepository by lazy {
+        FavoriteRepositoryImpl(
+            favoriteDao = database.favoriteDao(),
+            listingDao = database.listingDao(),
+            favoriteActionDao = database.favoriteActionDao(),
+            semanticSearchEngine = semanticSearchEngine,
+            context = context
         )
     }
 

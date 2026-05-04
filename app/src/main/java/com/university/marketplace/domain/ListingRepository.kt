@@ -27,4 +27,6 @@ interface ListingRepository {
         images: List<String>,
         location: String
     ): Listing
+
+    suspend fun saveListing(listing: Listing)
 }
