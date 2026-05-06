@@ -16,7 +16,10 @@ if (secretsFile.exists()) {
     }
 }
 
-val apiBaseUrl = "https://uniandesmarketplacebackend.onrender.com/"
+val apiBaseUrl = secretsProperties
+    .getProperty("API_BASE_URL")
+    ?.takeIf { it.isNotBlank() }
+    ?: "https://uniandesmarketplacebackend.onrender.com/"
 
 android {
     namespace = "com.university.marketplace"

@@ -29,6 +29,10 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import com.university.marketplace.BuildConfig
+import android.util.LruCache
+import kotlin.math.min
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 
 class ListingsRepository(
     private val api: ListingsApi = NetworkModule.listingsApi,
@@ -41,6 +45,19 @@ class ListingsRepository(
     private val listType = Types.newParameterizedType(List::class.java, String::class.java)
     private val listAdapter = moshi.adapter<List<String>>(listType)
 
+    // In-memory LRU cache para embeddings. La unidad usada es KB en sizeOf.
+    private val embeddingCache: LruCache<String, FloatArray> by lazy {
+        // tomar hasta 1/8 de la heap disponible, pero no más de 8MB
+        val maxMemoryKb = (Runtime.getRuntime().maxMemory() / 1024).toInt()
+        val cacheSizeKb = min(maxMemoryKb / 8, 8 * 1024)
+        object : LruCache<String, FloatArray>(cacheSizeKb) {
+            override fun sizeOf(key: String, value: FloatArray): Int {
+                // tamaño aproximado en KB
+                return (value.size * 4) / 1024
+            }
+        }
+    }
+
     override fun getActiveListings(): Flow<List<Listing>> {
         return dao.getActiveListings().map { entities ->
             entities.map { it.toDomain() }
@@ -50,10 +67,22 @@ class ListingsRepository(
     override suspend fun refreshListings() {
         withContext(Dispatchers.IO) {
             try {
-                val remoteListings = api.getListings(status = "published")
+                // Descargar TODOS los listings sin filtro de status (antes solo "published")
+                val remoteListings = api.getListings()
                 val entities = remoteListings.map { dto ->
                     val domain = dto.toDomain()
-                    val embedding = semanticSearchEngine.getEmbedding("${domain.title} ${domain.description}")
+                    // Revisar cache en memoria por id
+                    val cached = embeddingCache.get(domain.id)
+                    val embedding = if (cached != null) {
+                        cached
+                    } else {
+                        // Embedding generation puede ser CPU-bound (TFLite o cálculo local), ejecutar en Default
+                        val emb = withContext(Dispatchers.Default) {
+                            semanticSearchEngine.getEmbedding("${domain.title} ${domain.description}")
+                        }
+                        embeddingCache.put(domain.id, emb)
+                        emb
+                    }
                     domain.toEntity(embedding)
                 }
                 dao.insertListings(entities)
@@ -92,6 +121,16 @@ class ListingsRepository(
         }
 
         val cachedEntities = dao.getActiveListingsList()
+        // Prefill cache con embeddings ya persistidos para evitar recalcular o parsear repetidamente
+        cachedEntities.forEach { entity ->
+            entity.embedding?.let { embeddingBytes ->
+                if (embeddingCache.get(entity.id) == null) {
+                    byteArrayToFloatArray(embeddingBytes)?.let { floatArray ->
+                        embeddingCache.put(entity.id, floatArray)
+                    }
+                }
+            }
+        }
         if (cachedSearch == null) {
             emit(cachedEntities.map { it.toDomain() })
         }
@@ -103,7 +142,19 @@ class ListingsRepository(
 
         coroutineScope {
             val intentDeferred = async { parseSearchIntent(query) }
-            val queryEmbeddingDeferred = async { semanticSearchEngine.getEmbedding(semanticQuery) }
+            // Revisar cache para embedding de la query
+            val queryCacheKey = "q:$semanticQuery"
+            val cachedQueryEmbedding = embeddingCache.get(queryCacheKey)
+            val queryEmbeddingDeferred = if (cachedQueryEmbedding != null) {
+                async { cachedQueryEmbedding }
+            } else {
+                // Generación del embedding de la query es CPU-bound: ejecutarlo en Dispatchers.Default
+                async(Dispatchers.Default) {
+                    val emb = semanticSearchEngine.getEmbedding(semanticQuery)
+                    embeddingCache.put(queryCacheKey, emb)
+                    emb
+                }
+            }
 
             val intent = intentDeferred.await()
             val queryEmbedding = queryEmbeddingDeferred.await()
@@ -112,7 +163,9 @@ class ListingsRepository(
             val rankedListings = cachedEntities.map { entity ->
                 val listing = entity.toDomain()
                 val semanticScore = if (entity.embedding != null) {
-                    semanticSearchEngine.calculateCosineSimilarity(queryEmbedding, entity.embedding)
+                    byteArrayToFloatArray(entity.embedding)?.let {
+                        semanticSearchEngine.calculateCosineSimilarity(queryEmbedding, it)
+                    } ?: 0f
                 } else {
                     0f
                 }
@@ -291,7 +344,7 @@ class ListingsRepository(
 
     private fun extractMaxPriceFromQuery(query: String): Double? {
         val normalized = SearchTextNormalizer.normalize(query)
-        val regex = "(\\d+[\\d\\.]*)\\s*(k|mil|m|millon|millones)?".toRegex()
+        val regex = "(\\d+[\\d.]*)\\s*(k|mil|m|millon|millones)?".toRegex()
         val match = regex.find(normalized) ?: return null
         val numberRaw = match.groupValues[1].replace(".", "")
         val base = numberRaw.toDoubleOrNull() ?: return null
@@ -321,5 +374,16 @@ class ListingsRepository(
             }
         }
         return costs[b.length]
+    }
+
+    // Helper para convertir ByteArray (BLOB) a FloatArray
+    private fun byteArrayToFloatArray(bytes: ByteArray?): FloatArray? {
+        if (bytes == null) return null
+        val buffer = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN)
+        val floats = FloatArray(bytes.size / 4)
+        for (i in floats.indices) {
+            floats[i] = buffer.getFloat(i * 4)
+        }
+        return floats
     }
 }

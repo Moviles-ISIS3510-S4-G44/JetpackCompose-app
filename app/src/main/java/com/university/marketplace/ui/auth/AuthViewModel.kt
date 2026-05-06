@@ -10,6 +10,7 @@ import com.university.marketplace.data.location.LocationRepository
 import com.university.marketplace.data.isNetworkConnectivityError
 import com.university.marketplace.domain.AuthenticatedUser
 import com.university.marketplace.ui.common.toUserFriendlyMessage
+import com.university.marketplace.BuildConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -109,7 +110,11 @@ class AuthViewModel(
             value.contains("invalid credentials") -> "Correo o contraseña incorrectos."
             value.contains("already registered") -> "Este correo ya tiene una cuenta registrada."
             value.contains("session has expired") -> "Tu sesión expiró. Inicia sesión nuevamente."
-            else -> "No pudimos completar la solicitud. Intenta nuevamente."
+            else -> if (BuildConfig.DEBUG && !this.isNullOrBlank()) {
+                this
+            } else {
+                "No pudimos completar la solicitud. Intenta nuevamente."
+            }
         }
     }
 }
