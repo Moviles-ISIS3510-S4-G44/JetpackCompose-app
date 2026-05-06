@@ -4,6 +4,24 @@ import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Wifi
+import androidx.compose.material.icons.filled.WifiOff
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -13,51 +31,33 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Text
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import androidx.navigation.NavType
-import androidx.navigation.navArgument
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
-import androidx.navigation.compose.rememberNavController
-import com.university.marketplace.di.DefaultAppContainer
+import com.university.marketplace.connectivity.AndroidConnectivityMonitor
 import com.university.marketplace.data.auth.AuthException
 import com.university.marketplace.data.auth.AuthRepositoryFactory
 import com.university.marketplace.data.auth.UnauthorizedAuthException
-import com.university.marketplace.connectivity.AndroidConnectivityMonitor
+import com.university.marketplace.di.DefaultAppContainer
 import com.university.marketplace.map.MapViewModel
 import com.university.marketplace.map.MapViewScreen
+import com.university.marketplace.ui.MarketplaceViewModelFactory
 import com.university.marketplace.ui.auth.AuthViewModel
 import com.university.marketplace.ui.auth.AuthViewModelFactory
 import com.university.marketplace.ui.auth.SignInScreen
 import com.university.marketplace.ui.auth.SignUpScreen
-import com.university.marketplace.ui.MarketplaceViewModelFactory
-import com.university.marketplace.ui.home.HomeMarketplaceScreen
 import com.university.marketplace.ui.home.CreateListingScreen
 import com.university.marketplace.ui.home.CreateListingViewModel
+import com.university.marketplace.ui.home.HomeMarketplaceScreen
 import com.university.marketplace.ui.home.HomeViewModel
 import com.university.marketplace.ui.home.ListingDetailViewModel
 import com.university.marketplace.ui.home.ProductDetailScreen
 import com.university.marketplace.ui.profile.MyListingsViewModel
 import com.university.marketplace.ui.profile.ProfileRoute
-import com.university.marketplace.data.api.NetworkModule
 import com.university.marketplace.ui.chat.ChatScreen
-import com.university.marketplace.ui.chat.ChatViewModelFactory
 import com.university.marketplace.ui.chat.ChatViewModel
+import com.university.marketplace.ui.chat.ChatViewModelFactory
 import com.university.marketplace.ui.chat.ConversationListScreen
 import com.university.marketplace.ui.chat.ConversationListViewModel
 import com.university.marketplace.ui.purchases.PurchaseHistoryScreen
@@ -65,6 +65,14 @@ import com.university.marketplace.ui.purchases.PurchaseHistoryViewModel
 import com.university.marketplace.ui.purchases.SalesHistoryScreen
 import com.university.marketplace.ui.purchases.SalesHistoryViewModel
 import com.university.marketplace.ui.theme.JetpackComposeAppTheme
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import androidx.navigation.NavType
+import androidx.navigation.navArgument
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import com.university.marketplace.data.api.NetworkModule
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -122,14 +130,27 @@ fun AppNavigation(container: com.university.marketplace.di.AppContainer) {
 
     var lastNotifiedOnline by rememberSaveable { mutableStateOf<Boolean?>(null) }
     var uiMessage by rememberSaveable { mutableStateOf<String?>(null) }
+    var uiMessageIsOnline by rememberSaveable { mutableStateOf<Boolean?>(null) }
+    var lastOfflineAt by rememberSaveable { mutableStateOf<Long?>(null) }
+
     LaunchedEffect(isOnline) {
         val previous = lastNotifiedOnline
         lastNotifiedOnline = isOnline
         if (previous == null || previous == isOnline) return@LaunchedEffect
-        uiMessage = if (isOnline) {
-            "Conexion restablecida"
+
+        val now = System.currentTimeMillis()
+        if (!isOnline) {
+            lastOfflineAt = now
+            uiMessageIsOnline = false
+            uiMessage = "Sin conexión. Algunas acciones requieren internet."
         } else {
-            "Sin conexion. Algunas acciones requeriran internet."
+            val offlineDuration = lastOfflineAt?.let { now - it } ?: 0L
+            lastOfflineAt = null
+            // Mostrar "restablecida" solo si realmente hubo desconexión perceptible.
+            if (offlineDuration >= 2000L) {
+                uiMessageIsOnline = true
+                uiMessage = "Conexión restablecida"
+            }
         }
     }
 
@@ -351,19 +372,37 @@ fun AppNavigation(container: com.university.marketplace.di.AppContainer) {
                 .fillMaxSize()
                 .padding(top = 12.dp, start = 12.dp, end = 12.dp)
         ) {
+            val isOnlineMessage = uiMessageIsOnline == true
+            val bannerColor = if (isOnlineMessage) {
+                Color(0xFF0F766E)
+            } else {
+                Color(0xFFB45309)
+            }
+            val bannerIcon = if (isOnlineMessage) Icons.Filled.Wifi else Icons.Filled.WifiOff
+
             Card(
                 colors = CardDefaults.cardColors(
-                    containerColor = Color(0xFF0F766E)
+                    containerColor = bannerColor
                 ),
                 elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
             ) {
-                Text(
-                    text = uiMessage.orEmpty(),
-                    color = Color.White,
+                Row(
                     modifier = androidx.compose.ui.Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 14.dp, vertical = 10.dp)
-                )
+                ) {
+                    Icon(
+                        imageVector = bannerIcon,
+                        contentDescription = null,
+                        tint = Color.White
+                    )
+                    Spacer(modifier = androidx.compose.ui.Modifier.width(10.dp))
+                    Text(
+                        text = uiMessage.orEmpty(),
+                        color = Color.White,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
             }
         }
     }
