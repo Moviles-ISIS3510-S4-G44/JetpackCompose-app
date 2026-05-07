@@ -93,7 +93,6 @@ fun Listing.toEntity(embedding: FloatArray? = null): ListingEntity {
     val adapter = moshi.adapter<List<String>>(type)
     val imagesJson = adapter.toJson(images)
 
-    // Convertir FloatArray a ByteArray usando el converter
     val embeddingBytes = Converters().fromFloatArray(embedding)
 
     return ListingEntity(

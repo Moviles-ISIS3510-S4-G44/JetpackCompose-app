@@ -23,7 +23,6 @@ interface ListingDao {
     @Query("SELECT * FROM listings WHERE id = :id")
     suspend fun getListingById(id: String): ListingEntity?
 
-    // Search Cache
     @Query("SELECT * FROM search_cache WHERE `query` = :query")
     suspend fun getSearchCache(query: String): SearchCacheEntity?
 

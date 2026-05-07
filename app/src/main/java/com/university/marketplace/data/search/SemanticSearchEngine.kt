@@ -2,39 +2,53 @@ package com.university.marketplace.data.search
 
 import android.content.Context
 import android.content.res.AssetFileDescriptor
-import org.tensorflow.lite.DataType
+import ai.onnxruntime.OnnxTensor
+import ai.onnxruntime.OrtEnvironment
+import ai.onnxruntime.OrtSession
 import org.tensorflow.lite.Interpreter
-import org.tensorflow.lite.support.tensorbuffer.TensorBuffer
 import kotlin.math.sqrt
+import java.io.File
+import java.io.FileOutputStream
 import java.io.FileInputStream
 import java.nio.MappedByteBuffer
 import java.nio.channels.FileChannel
 
-/**
- * SemanticSearchEngine ahora intenta usar un modelo TFLite (all-MiniLM-L6-v2) si se encuentra
- * en assets con el nombre "all_minilm_l6_v2.tflite". Si no está disponible, cae al encoder
- * local antigua implementación basada en hash + ngrams.
- *
- * Nota: Este soporte TFLite es un *fallback opcional* y requiere que el modelo y su tokenizer
- * apropiado estén empaquetados correctamente en la app. El tokenizer usado aquí es un
- * placeholder muy simple: para producción necesitas el vocab y tokenization real de MiniLM
- * (por ejemplo, usando SentencePiece o WordPiece) y/o preprocesamiento correcto.
- */
+
 class SemanticSearchEngine(private val context: Context) {
     private val dimensions = 384
+    private val maxTokens = 32
+    private val onnxModelAssetName = "model.onnx"
     private val tfliteModelAssetName = "all_minilm_l6_v2.tflite"
+    private var ortEnv: OrtEnvironment? = null
+    private var ortSession: OrtSession? = null
     private var tfliteInterpreter: Interpreter? = null
     private var vocab: Map<String, Int>? = null
     private var unkId: Int = 100
     private var clsId: Int = 101
     private var sepId: Int = 102
 
+
     init {
-        // Intentar cargar el intérprete TFLite si existe el asset
+        try {
+            val tempFile = File(context.cacheDir, onnxModelAssetName)
+            if (!tempFile.exists() || tempFile.length() == 0L) {
+                context.assets.open(onnxModelAssetName).use { input ->
+                    FileOutputStream(tempFile).use { output ->
+                        input.copyTo(output)
+                    }
+                }
+            }
+            ortEnv = OrtEnvironment.getEnvironment()
+            ortSession = ortEnv?.createSession(tempFile.absolutePath)
+        } catch (_: Exception) {
+            ortEnv = null
+            ortSession = null
+        }
+
         try {
             val afd: AssetFileDescriptor? = try {
                 context.assets.openFd(tfliteModelAssetName)
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 null
             }
             afd?.let {
@@ -45,7 +59,6 @@ class SemanticSearchEngine(private val context: Context) {
                 val mapped: MappedByteBuffer = channel.map(FileChannel.MapMode.READ_ONLY, startOffset, declaredLength)
                 val options = Interpreter.Options()
                 tfliteInterpreter = Interpreter(mapped, options)
-                // intentar cargar vocab desde assets/vocab.txt
                 try {
                     val vocabLines = context.assets.open("vocab.txt").bufferedReader().useLines { it.toList() }
                     val map = mutableMapOf<String, Int>()
@@ -54,64 +67,119 @@ class SemanticSearchEngine(private val context: Context) {
                     unkId = map["[UNK]"] ?: unkId
                     clsId = map["[CLS]"] ?: clsId
                     sepId = map["[SEP]"] ?: sepId
-                } catch (e: Exception) {
-                    // vocab no disponible -> seguir sin tokenizador real
+                } catch (_: Exception) {
                     vocab = null
                 }
             }
         } catch (e: Exception) {
-            // Si ocurre cualquier error, dejamos tfliteInterpreter como null y usamos fallback
             e.printStackTrace()
             tfliteInterpreter = null
         }
     }
 
     fun getEmbedding(text: String): FloatArray {
-        // Si tenemos intérprete TFLite disponible intentamos generar embedding con MiniLM
-        tfliteInterpreter?.let { interpreter ->
+        val onnxSession = ortSession
+        val onnxEnv = ortEnv
+        if (onnxSession != null && onnxEnv != null) {
+            val normalizedText = SearchTextNormalizer.normalize(text)
             try {
-                val normalizedText = SearchTextNormalizer.normalize(text)
-
-                val maxLen = 32
-                // Si tenemos vocab cargado, usar tokenizador WordPiece; sino fallback a split
-                val inputIds = IntArray(maxLen) { 0 }
-                val inputMask = IntArray(maxLen) { 0 }
-
+                val inputIds = IntArray(maxTokens) { 0 }
+                val inputMask = IntArray(maxTokens) { 0 }
                 val ids = vocab?.let { v ->
-                    tokenizeToIds(normalizedText, v, maxLen)
+                    tokenizeToIds(normalizedText, v)
                 } ?: run {
-                    // fallback simple: split por espacios y hash
                     val tokens = normalizedText.split(" ").filter { it.isNotBlank() }
                     val simpleIds = tokens.map { (it.hashCode() and Int.MAX_VALUE) % 30000 }
-                    simpleIds.take(maxLen).toIntArray()
+                    simpleIds.take(maxTokens).toIntArray()
                 }
 
                 for (i in ids.indices) {
-                    if (i >= maxLen) break
+                    if (i >= maxTokens) break
                     inputIds[i] = ids[i]
                     inputMask[i] = 1
                 }
 
-                // Preparar inputs para modelo: a menudo MiniLM espera input_ids y attention_mask
-                val inputs: Array<Any> = arrayOf(inputIds, inputMask)
+                val inputIdsLong = LongArray(maxTokens) { inputIds[it].toLong() }
+                val inputMaskLong = LongArray(maxTokens) { inputMask[it].toLong() }
 
-                // Salida: float[1][dimensions]
+                val inputNames = onnxSession.inputNames.toList()
+                val inputIdsName = if (inputNames.contains("input_ids")) "input_ids" else inputNames.first()
+                val attentionName = if (inputNames.contains("attention_mask")) {
+                    "attention_mask"
+                } else {
+                    inputNames.getOrNull(1)
+                }
+
+                val inputTensors = mutableMapOf<String, OnnxTensor>()
+                val idsTensor = OnnxTensor.createTensor(onnxEnv, arrayOf(inputIdsLong))
+                inputTensors[inputIdsName] = idsTensor
+                val maskTensor = attentionName?.let {
+                    OnnxTensor.createTensor(onnxEnv, arrayOf(inputMaskLong))
+                }
+                if (maskTensor != null && attentionName != null) {
+                    inputTensors[attentionName] = maskTensor
+                }
+
+                val result = onnxSession.run(inputTensors)
+                val outputNames = onnxSession.outputNames.toList()
+                val outputName = when {
+                    outputNames.contains("sentence_embedding") -> "sentence_embedding"
+                    outputNames.contains("pooler_output") -> "pooler_output"
+                    else -> outputNames.first()
+                }
+                
+                val outputValue = result.get(outputName)
+                val output = if (outputValue.isPresent) {
+                    val onnxValue = outputValue.get()
+                    if (onnxValue is OnnxTensor) onnxValue.value else null
+                } else null
+
+                val embedding = extractOnnxEmbedding(output, inputMask)
+                result.close()
+                idsTensor.close()
+                maskTensor?.close()
+                if (embedding != null) return l2Normalize(embedding)
+            } catch (_: Exception) {
+            }
+        }
+
+        tfliteInterpreter?.let { interpreter ->
+            try {
+                val normalizedText = SearchTextNormalizer.normalize(text)
+
+                val inputIds = IntArray(maxTokens) { 0 }
+                val inputMask = IntArray(maxTokens) { 0 }
+
+                val ids = vocab?.let { v ->
+                    tokenizeToIds(normalizedText, v)
+                } ?: run {
+                    val tokens = normalizedText.split(" ").filter { it.isNotBlank() }
+                    val simpleIds = tokens.map { (it.hashCode() and Int.MAX_VALUE) % 30000 }
+                    simpleIds.take(maxTokens).toIntArray()
+                }
+
+                for (i in ids.indices) {
+                    if (i >= maxTokens) break
+                    inputIds[i] = ids[i]
+                    inputMask[i] = 1
+                }
+
+                val inputIdsBatch = Array(1) { inputIds }
+                val inputMaskBatch = Array(1) { inputMask }
+                val inputs: Array<Any> = arrayOf(inputIdsBatch, inputMaskBatch)
+
                 val outputBuffer = Array(1) { FloatArray(dimensions) }
 
-                // Ejecutar modelo con múltiples inputs -> outputs por índice
                 val outputs = HashMap<Int, Any>()
                 outputs[0] = outputBuffer
                 interpreter.runForMultipleInputsOutputs(inputs, outputs)
 
-                // Normalizar L2 y devolver
                 return l2Normalize(outputBuffer[0])
             } catch (e: Exception) {
                 e.printStackTrace()
-                // fallback al método local si TFLite falla
             }
         }
 
-        // Fallback: implementación heurística local (token hashing y ngrams)
         val normalizedText = SearchTextNormalizer.normalize(text)
         val baseTokens = SearchTextNormalizer.tokenize(normalizedText)
         val expandedTokens = SearchQueryExpander.expandTokens(baseTokens)
@@ -163,12 +231,10 @@ class SemanticSearchEngine(private val context: Context) {
         return (hash and Int.MAX_VALUE) % size
     }
 
-    private fun tokenizeToIds(text: String, vocabMap: Map<String, Int>, maxLen: Int): IntArray {
-        // Implementación WordPiece (similar a BERT). Retorna lista de ids truncada a maxLen-2 y con [CLS]/[SEP]
+    private fun tokenizeToIds(text: String, vocabMap: Map<String, Int>): IntArray {
         val tokens = mutableListOf<Int>()
         tokens.add(clsId)
 
-        // Basic tokenization: split por espacios y limpiar
         val words = text.split(Regex("\\s+"))
         for (word in words) {
             if (word.isBlank()) continue
@@ -176,17 +242,15 @@ class SemanticSearchEngine(private val context: Context) {
             for (st in subTokens) {
                 val id = vocabMap[st] ?: vocabMap["[UNK]"] ?: unkId
                 tokens.add(id)
-                if (tokens.size >= maxLen - 1) break
+                if (tokens.size >= maxTokens - 1) break
             }
-            if (tokens.size >= maxLen - 1) break
+            if (tokens.size >= maxTokens - 1) break
         }
 
-        // add SEP
         tokens.add(sepId)
 
-        // pad/truncate to maxLen
-        val out = IntArray(maxLen) { 0 }
-        for (i in 0 until minOf(tokens.size, maxLen)) out[i] = tokens[i]
+        val out = IntArray(maxTokens) { 0 }
+        for (i in 0 until minOf(tokens.size, maxTokens)) out[i] = tokens[i]
         return out
     }
 
@@ -208,7 +272,6 @@ class SemanticSearchEngine(private val context: Context) {
                 end -= 1
             }
             if (curSubStr == null) {
-                // fallback: unknown token
                 subTokens.add("[UNK]")
                 break
             }
@@ -216,6 +279,40 @@ class SemanticSearchEngine(private val context: Context) {
             start = end
         }
         return subTokens
+    }
+
+    private fun extractOnnxEmbedding(output: Any?, attentionMask: IntArray): FloatArray? {
+        if (output !is Array<*>) return null
+        if (output.isEmpty()) return null
+        val first = output[0]
+        if (first is FloatArray) return first
+        if (first is Array<*> && first.isNotEmpty() && first[0] is FloatArray) {
+            @Suppress("UNCHECKED_CAST")
+            val tokenEmbeddings = output as Array<Array<FloatArray>>
+            return meanPool(tokenEmbeddings[0], attentionMask)
+        }
+        return null
+    }
+
+    private fun meanPool(tokenEmbeddings: Array<FloatArray>, attentionMask: IntArray): FloatArray {
+        val hidden = tokenEmbeddings.firstOrNull()?.size ?: dimensions
+        val result = FloatArray(hidden)
+        var count = 0
+        for (i in tokenEmbeddings.indices) {
+            if (i >= attentionMask.size) break
+            if (attentionMask[i] == 0) continue
+            val tokenVec = tokenEmbeddings[i]
+            for (j in 0 until hidden) {
+                result[j] += tokenVec[j]
+            }
+            count += 1
+        }
+        if (count > 0) {
+            for (j in 0 until hidden) {
+                result[j] /= count.toFloat()
+            }
+        }
+        return result
     }
 
     private fun l2Normalize(vector: FloatArray): FloatArray {

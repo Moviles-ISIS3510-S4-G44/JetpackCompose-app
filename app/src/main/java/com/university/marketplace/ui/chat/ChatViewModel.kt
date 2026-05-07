@@ -34,8 +34,6 @@ class ChatViewModel(
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
 
     init {
-        // Connect immediately so in-flight messages buffer in Channel.UNLIMITED
-        // while history is loading, then collect them after history is set.
         wsClient.connect(conversationId, token)
         viewModelScope.launch {
             loadHistory()
@@ -68,7 +66,6 @@ class ChatViewModel(
                     )
                     _uiState.update { state ->
                         if (state is ChatUiState.Success) {
-                            // Deduplicate: message may appear in both history and buffered WS events
                             if (state.messages.any { it.id == newMsg.id }) state
                             else state.copy(messages = state.messages + newMsg)
                         } else {

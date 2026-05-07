@@ -74,6 +74,7 @@ android {
 
     androidResources {
         noCompress += "tflite"
+        noCompress += "onnx"
     }
 }
 
@@ -125,6 +126,8 @@ dependencies {
     // TFLite
     implementation("org.tensorflow:tensorflow-lite:2.16.1")
     implementation("org.tensorflow:tensorflow-lite-support:0.4.4")
+    // ONNX Runtime
+    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.17.1")
 
     implementation("com.google.maps.android:maps-compose:6.1.0")
     implementation("com.google.android.gms:play-services-maps:19.0.0")

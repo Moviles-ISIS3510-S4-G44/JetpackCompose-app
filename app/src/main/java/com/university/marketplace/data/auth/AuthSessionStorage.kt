@@ -82,10 +82,6 @@ class AuthSessionStorage(context: Context) {
             .apply()
     }
 
-    /**
-     * Called at application startup to drop any session that the user did not
-     * ask us to remember across app launches.
-     */
     fun clearIfNotRemembered() {
         if (getAccessToken().isNullOrBlank()) return
         val remember = preferences.getBoolean(KEY_REMEMBER_ME, true)

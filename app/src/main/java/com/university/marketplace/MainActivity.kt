@@ -146,7 +146,6 @@ fun AppNavigation(container: com.university.marketplace.di.AppContainer) {
         } else {
             val offlineDuration = lastOfflineAt?.let { now - it } ?: 0L
             lastOfflineAt = null
-            // Mostrar "restablecida" solo si realmente hubo desconexión perceptible.
             if (offlineDuration >= 2000L) {
                 uiMessageIsOnline = true
                 uiMessage = "Conexión restablecida"
@@ -219,11 +218,9 @@ fun AppNavigation(container: com.university.marketplace.di.AppContainer) {
                     navigateToTopLevel("profile")
                 },
                 onNavigateToDetail = { listingId ->
-                    // Restoration of Map flow: Navigate to Map first as requested
                     navController.navigate("map/$listingId")
                 },
                 onNavigateToSell = {
-                    // Allowed even offline (Eventual connectivity)
                     navController.navigate("create_listing")
                 },
                 onNavigateToPurchases = {
