@@ -134,7 +134,8 @@ class SearchListingsByRelevanceUseCaseTest {
             price: Int,
             condition: String,
             images: List<String>,
-            location: String
+            location: String,
+            locationName: String? = null
         ): Listing = listings.first()
     }
 }

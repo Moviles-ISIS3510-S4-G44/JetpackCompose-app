@@ -188,10 +188,6 @@ class HomeViewModel(
             .toList()
 
         val weighted = applyUserBehaviorWeights(filtered)
-        if (weighted.isNotEmpty()) {
-            val first = weighted.first()
-            android.util.Log.d("HomeViewModel", "Mapping item ${first.title}: object=$first, userLoc=${userLocation != null}")
-        }
         updateSections(weighted.map { it.toUiModel(userLocation) })
     }
 

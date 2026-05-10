@@ -34,7 +34,7 @@ fun ListingDto.toDomain(): Listing {
         status = status,
         latitude = coordinates?.latitude,
         longitude = coordinates?.longitude,
-        locationName = nameFromLocation
+        locationName = this.locationName ?: nameFromLocation
     )
 }
 

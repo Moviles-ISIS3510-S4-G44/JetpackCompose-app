@@ -92,30 +92,13 @@ class ListingDetailViewModel(
                             latitude = loc.latitude
                             longitude = loc.longitude
                         }
-                        // We need the original domain Listing here, but we only have ListingUiModel
-                        // This is a bit tricky. Maybe we should store the domain listing too?
-                        // Or just update the distance in the UI model.
                         val currentListing = state.content.listing
-                        // We can't easily re-calculate from UiModel because it doesn't have all data.
-                        // Actually, ListingUiModel HAS latitude and longitude!
-                        
-                        val baseLocation = currentListing.locationName
-                        val dest = android.location.Location("dest").apply {
-                            latitude = currentListing.latitude ?: 0.0
-                            longitude = currentListing.longitude ?: 0.0
-                        }
-                        val distanceStr = if (currentListing.latitude != null && currentListing.longitude != null) {
-                            val distanceMeters = androidLoc.distanceTo(dest)
-                            if (distanceMeters < 1000) {
-                                "$baseLocation • ${distanceMeters.toInt()}m"
-                            } else {
-                                java.util.Locale.US.let { locale ->
-                                    String.format(locale, "%s • %.1f km", baseLocation, distanceMeters / 1000f)
-                                }
-                            }
-                        } else {
-                            baseLocation
-                        }
+                        val distanceStr = calculateDistanceString(
+                            currentListing.locationName,
+                            currentListing.latitude,
+                            currentListing.longitude,
+                            androidLoc
+                        )
                         ListingDetailUiState.Content.Success(currentListing.copy(distance = distanceStr))
                     } else {
                         state.content

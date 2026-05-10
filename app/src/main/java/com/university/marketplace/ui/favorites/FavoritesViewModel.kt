@@ -28,7 +28,10 @@ class FavoritesViewModel(
     private val _uiState = MutableStateFlow(FavoritesUiState())
     val uiState: StateFlow<FavoritesUiState> = _uiState.asStateFlow()
 
-    private var userLocation: Location? = null
+    private var userLocation: Location? = Location("default").apply {
+        latitude = 4.601
+        longitude = -74.065
+    }
 
     init {
         refreshUserLocation()

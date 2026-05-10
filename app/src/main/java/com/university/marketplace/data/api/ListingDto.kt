@@ -12,7 +12,8 @@ data class ListingDto(
     val condition: String,
     val images: List<String>,
     val status: String,
-    val location: Any? // Can be String or Map<String, Double>
+    val location: Any?, // Can be String or Map<String, Double>
+    @Json(name = "location_name") val locationName: String? = null
 )
 
 data class LocationDto(

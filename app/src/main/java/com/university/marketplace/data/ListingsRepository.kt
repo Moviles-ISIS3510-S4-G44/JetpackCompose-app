@@ -184,7 +184,8 @@ class ListingsRepository(
         price: Int,
         condition: String,
         images: List<String>,
-        location: String
+        location: String,
+        locationName: String?
     ): Listing {
         val listing = api.createListing(
             CreateListingDto(
@@ -195,7 +196,8 @@ class ListingsRepository(
                 price = price,
                 condition = condition,
                 images = images,
-                location = location
+                location = location,
+                locationName = locationName
             )
         ).toDomain()
         saveListing(listing)
