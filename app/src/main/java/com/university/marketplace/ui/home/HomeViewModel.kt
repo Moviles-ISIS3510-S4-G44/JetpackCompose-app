@@ -45,6 +45,9 @@ class HomeViewModel(
     private val _selectedPriceCap = MutableStateFlow<Int?>(null)
     val selectedPriceCap: StateFlow<Int?> = _selectedPriceCap.asStateFlow()
 
+    private val _selectedLocationSort = MutableStateFlow(LocationSortOption.NONE)
+    val selectedLocationSort: StateFlow<LocationSortOption> = _selectedLocationSort.asStateFlow()
+
     private var allListings: List<Listing> = emptyList()
     private var currentSearchResults: List<Listing>? = null
     private var searchJob: Job? = null
@@ -165,6 +168,11 @@ class HomeViewModel(
         applyFiltersAndPublish()
     }
 
+    fun onLocationSortSelected(option: LocationSortOption) {
+        _selectedLocationSort.value = option
+        applyFiltersAndPublish()
+    }
+
     fun onListingOpened(listing: ListingUiModel) {
         listingInterestWeights[listing.id] = (listingInterestWeights[listing.id] ?: 0f) + 1.5f
         val normalizedCategory = listing.category.trim().lowercase()
@@ -176,6 +184,7 @@ class HomeViewModel(
         val baseListings = currentSearchResults ?: allListings
         val categoryId = _selectedCategoryId.value
         val priceCap = _selectedPriceCap.value
+        val sortOption = _selectedLocationSort.value
 
         val filtered = baseListings
             .asSequence()
@@ -187,8 +196,31 @@ class HomeViewModel(
             }
             .toList()
 
-        val weighted = applyUserBehaviorWeights(filtered)
-        updateSections(weighted.map { it.toUiModel(userLocation) })
+        val processed = when (sortOption) {
+            LocationSortOption.NEAREST -> sortByDistance(filtered, nearest = true)
+            LocationSortOption.FARTHEST -> sortByDistance(filtered, nearest = false)
+            LocationSortOption.NONE -> applyUserBehaviorWeights(filtered)
+        }
+
+        updateSections(processed.map { it.toUiModel(userLocation) })
+    }
+
+    private fun sortByDistance(listings: List<Listing>, nearest: Boolean): List<Listing> {
+        val currentLoc = userLocation ?: return listings
+        return listings.sortedWith { a, b ->
+            val distA = calculateRawDistance(a, currentLoc)
+            val distB = calculateRawDistance(b, currentLoc)
+            if (nearest) distA.compareTo(distB) else distB.compareTo(distA)
+        }
+    }
+
+    private fun calculateRawDistance(listing: Listing, currentLoc: Location): Float {
+        if (listing.latitude == null || listing.longitude == null) return Float.MAX_VALUE
+        val dest = Location("dest").apply {
+            latitude = listing.latitude
+            longitude = listing.longitude
+        }
+        return currentLoc.distanceTo(dest)
     }
 
     private fun applyUserBehaviorWeights(listings: List<Listing>): List<Listing> {
@@ -202,7 +234,7 @@ class HomeViewModel(
     }
 
     private fun updateSections(listings: List<ListingUiModel>) {
-        val isFiltering = _searchQuery.value.isNotEmpty() || _selectedCategoryId.value != null || _selectedPriceCap.value != null
+        val isFiltering = _searchQuery.value.isNotEmpty() || _selectedCategoryId.value != null || _selectedPriceCap.value != null || _selectedLocationSort.value != LocationSortOption.NONE
         val featured = listings.take(4)
         val recent = listings.drop(4)
         _uiState.value = HomeUiState.Success(
@@ -210,7 +242,8 @@ class HomeViewModel(
             recent = recent,
             isSearching = isFiltering,
             selectedCategory = _selectedCategoryId.value ?: "Todo",
-            selectedPriceCap = _selectedPriceCap.value
+            selectedPriceCap = _selectedPriceCap.value,
+            selectedLocationSort = _selectedLocationSort.value
         )
     }
 }
