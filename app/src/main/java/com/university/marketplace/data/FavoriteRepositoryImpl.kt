@@ -2,6 +2,7 @@ package com.university.marketplace.data
 
 import android.content.Context
 import androidx.work.*
+import com.university.marketplace.data.api.NetworkModule
 import com.university.marketplace.data.local.*
 import com.university.marketplace.data.search.SemanticSearchEngine
 import com.university.marketplace.data.sync.SyncFavoritesWorker
@@ -43,6 +44,20 @@ class FavoriteRepositoryImpl(
 
     override fun isFavorite(listingId: String): Flow<Boolean> {
         return favoriteDao.isFavorite(listingId)
+    }
+
+    override suspend fun mergeFavoritesFromServer() = withContext(Dispatchers.IO) {
+        try {
+            NetworkModule.initialize(context)
+            val response = NetworkModule.favoritesApi.getFavorites()
+            if (!response.isSuccessful) return@withContext
+            val body = response.body() ?: return@withContext
+            for (id in body.listingIds) {
+                favoriteDao.insertFavorite(FavoriteEntity(listingId = id))
+            }
+        } catch (_: Exception) {
+            // Offline or API error — keep local state only
+        }
     }
 
     override suspend fun getRecommendations(): List<Listing> = withContext(Dispatchers.Default) {

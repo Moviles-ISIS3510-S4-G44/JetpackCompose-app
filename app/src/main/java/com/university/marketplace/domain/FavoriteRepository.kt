@@ -7,4 +7,5 @@ interface FavoriteRepository {
     suspend fun toggleFavorite(listingId: String)
     fun isFavorite(listingId: String): Flow<Boolean>
     suspend fun getRecommendations(): List<Listing>
+    suspend fun mergeFavoritesFromServer()
 }

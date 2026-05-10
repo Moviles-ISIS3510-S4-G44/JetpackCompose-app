@@ -146,7 +146,7 @@ fun AppNavigation(container: com.university.marketplace.di.AppContainer) {
         NavHost(navController = navController, startDestination = startDestination) {
         composable("sign_in") {
             val authViewModel = viewModel<AuthViewModel>(
-                factory = AuthViewModelFactory(authRepository, container.locationRepository)
+                factory = AuthViewModelFactory(authRepository, container.locationRepository, container.favoriteRepository)
             )
             SignInScreen(
                 isOnline = isOnline,
@@ -164,7 +164,7 @@ fun AppNavigation(container: com.university.marketplace.di.AppContainer) {
         }
         composable("sign_up") {
             val authViewModel = viewModel<AuthViewModel>(
-                factory = AuthViewModelFactory(authRepository, container.locationRepository)
+                factory = AuthViewModelFactory(authRepository, container.locationRepository, container.favoriteRepository)
             )
             SignUpScreen(
                 isOnline = isOnline,
