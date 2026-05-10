@@ -210,7 +210,7 @@ class ListingsRepository(
 
     override suspend fun saveListing(listing: Listing) {
         withContext(Dispatchers.IO) {
-            val embedding = semanticSearchEngine.getEmbedding("\${listing.title} \${listing.description}")
+            val embedding = semanticSearchEngine.getEmbedding("${listing.title} ${listing.description}")
             dao.insertListings(listOf(listing.toEntity(embedding)))
         }
     }

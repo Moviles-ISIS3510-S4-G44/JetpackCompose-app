@@ -303,7 +303,7 @@ fun AppNavigation(container: com.university.marketplace.di.AppContainer) {
             route = "other_profile/{sellerId}?sellerName={sellerName}",
             arguments = listOf(
                 navArgument("sellerId") { type = NavType.StringType },
-                navArgument("sellerName") { type = NavType.StringType }
+                navArgument("sellerName") { type = NavType.StringType; defaultValue = "" }
             )
         ) { backStackEntry ->
             val sellerId = backStackEntry.arguments?.getString("sellerId") ?: ""
@@ -312,7 +312,7 @@ fun AppNavigation(container: com.university.marketplace.di.AppContainer) {
             
             OtherUserProfileScreen(
                 sellerId = sellerId,
-                sellerName = sellerName,
+                initialSellerName = sellerName,
                 viewModel = otherUserProfileViewModel,
                 onBack = { navController.popBackStack() },
                 onNavigateToDetail = { id -> navController.navigate("product_detail/$id") }

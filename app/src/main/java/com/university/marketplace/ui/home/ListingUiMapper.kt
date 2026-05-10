@@ -19,7 +19,7 @@ fun Listing.toUiModel(userLocation: Location? = null): ListingUiModel {
         latitude = latitude,
         longitude = longitude,
         condition = condition,
-        sellerName = "Seller $sellerId",
+        sellerName = sellerName ?: "Seller $sellerId",
         locationName = baseLocation,
         distance = distanceStr
     )

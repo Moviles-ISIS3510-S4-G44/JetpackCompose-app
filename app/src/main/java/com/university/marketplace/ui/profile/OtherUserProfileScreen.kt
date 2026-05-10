@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.style.TextOverflow
 import coil.compose.AsyncImage
+import com.university.marketplace.domain.AuthenticatedUser
 import com.university.marketplace.ui.home.ListingUiModel
 import com.university.marketplace.ui.theme.*
 
@@ -36,7 +37,7 @@ import com.university.marketplace.ui.theme.*
 @Composable
 fun OtherUserProfileScreen(
     sellerId: String,
-    sellerName: String,
+    initialSellerName: String? = null,
     viewModel: OtherUserProfileViewModel,
     onBack: () -> Unit,
     onNavigateToDetail: (String) -> Unit
@@ -76,13 +77,24 @@ fun OtherUserProfileScreen(
                     )
                 }
                 else -> {
-                    val displaySellerName = if (sellerName.length > 20) {
-                        "Seller " + (sellerName.split("-").firstOrNull()?.uppercase() ?: sellerName.take(8))
+                    // Always use the data from the server as the source of truth
+                    val fetchedUser = uiState.user
+                    
+                    val displayUser = if (fetchedUser != null) {
+                        fetchedUser
                     } else {
-                        sellerName
+                        // Fallback while loading or if not found
+                        val rawName = if (!initialSellerName.isNullOrBlank()) initialSellerName else sellerId
+                        val cleanName = if (rawName == sellerId && (rawName.contains("-") || rawName.length > 20)) {
+                            formatSellerId(rawName)
+                        } else {
+                            rawName
+                        }
+                        AuthenticatedUser(sellerId, cleanName, "", 4)
                     }
+
                     SellerProfileContent(
-                        sellerName = displaySellerName,
+                        user = displayUser,
                         listings = uiState.listings,
                         onNavigateToDetail = onNavigateToDetail
                     )
@@ -92,9 +104,13 @@ fun OtherUserProfileScreen(
     }
 }
 
+private fun formatSellerId(id: String): String {
+    return "Seller " + (id.split("-").firstOrNull()?.uppercase() ?: id.take(8))
+}
+
 @Composable
 private fun SellerProfileContent(
-    sellerName: String,
+    user: AuthenticatedUser,
     listings: List<ListingUiModel>,
     onNavigateToDetail: (String) -> Unit
 ) {
@@ -103,7 +119,7 @@ private fun SellerProfileContent(
         contentPadding = PaddingValues(bottom = 20.dp)
     ) {
         item {
-            SellerHeader(sellerName = sellerName)
+            SellerHeader(user = user)
         }
 
         item {
@@ -113,7 +129,7 @@ private fun SellerProfileContent(
                     .fillMaxWidth()
             ) {
                 Text(
-                    text = "Listings by $sellerName",
+                    text = "Listings by ${user.name}",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     color = MarketplaceDark,
@@ -143,7 +159,7 @@ private fun SellerProfileContent(
 }
 
 @Composable
-private fun SellerHeader(sellerName: String) {
+private fun SellerHeader(user: AuthenticatedUser) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -174,7 +190,7 @@ private fun SellerHeader(sellerName: String) {
             }
             Spacer(modifier = Modifier.height(12.dp))
             Text(
-                text = sellerName,
+                text = user.name,
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
                 color = MarketplaceDark,
@@ -192,7 +208,7 @@ private fun SellerHeader(sellerName: String) {
                 ) {
                     Icon(Icons.Default.Star, contentDescription = null, modifier = Modifier.size(14.dp), tint = MarketplaceYellow)
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("4.8 Seller Rating", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Text("${user.rating}/5 Seller Rating", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }

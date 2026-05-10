@@ -61,7 +61,9 @@ class MarketplaceViewModelFactory(
             }
             modelClass.isAssignableFrom(OtherUserProfileViewModel::class.java) -> {
                 OtherUserProfileViewModel(
-                    getListingsBySellerUseCase = container.getListingsBySellerUseCase
+                    getListingsBySellerUseCase = container.getListingsBySellerUseCase,
+                    profileVisitsRepository = container.profileVisitsRepository,
+                    authRepository = authRepository
                 ) as T
             }
             modelClass.isAssignableFrom(PurchaseHistoryViewModel::class.java) -> {

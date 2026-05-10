@@ -7,6 +7,7 @@ import retrofit2.http.Field
 import retrofit2.http.FormUrlEncoded
 import retrofit2.http.GET
 import retrofit2.http.POST
+import retrofit2.http.Path
 
 interface AuthApiService {
     @POST("auth/signup")
@@ -21,6 +22,9 @@ interface AuthApiService {
 
     @GET("users/me")
     suspend fun getCurrentUser(): Response<CurrentUserResponseDto>
+
+    @GET("users/{user_id}")
+    suspend fun getUserProfile(@Path("user_id") userId: String): Response<CurrentUserResponseDto>
 
     @POST("auth/logout")
     suspend fun logout(@Body payload: LogoutRequestDto): Response<Unit>

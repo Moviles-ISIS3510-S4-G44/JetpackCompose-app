@@ -27,6 +27,7 @@ object NetworkModule {
     private lateinit var authApiInternal: AuthApiService
     private lateinit var listingsApiInternal: ListingsApi
     private lateinit var interactionsApiInternal: InteractionsApi
+    private lateinit var profileVisitsApiInternal: ProfileVisitsApi
     private lateinit var favoritesApiInternal: FavoritesApi
     private lateinit var categoriesApiInternal: CategoriesApi
     private lateinit var purchasesApiInternal: PurchasesApi
@@ -46,6 +47,9 @@ object NetworkModule {
 
     val interactionsApi: InteractionsApi
         get() = synchronized(this) { interactionsApiInternal }
+
+    val profileVisitsApi: ProfileVisitsApi
+        get() = synchronized(this) { profileVisitsApiInternal }
 
     val favoritesApi: FavoritesApi
         get() = synchronized(this) { favoritesApiInternal }
@@ -137,6 +141,7 @@ object NetworkModule {
             authApiInternal = authenticatedRetrofit.create(AuthApiService::class.java)
             listingsApiInternal = authenticatedMoshiRetrofit.create(ListingsApi::class.java)
             interactionsApiInternal = authenticatedRetrofit.create(InteractionsApi::class.java)
+            profileVisitsApiInternal = authenticatedRetrofit.create(ProfileVisitsApi::class.java)
             favoritesApiInternal = authenticatedRetrofit.create(FavoritesApi::class.java)
             categoriesApiInternal = authenticatedMoshiRetrofit.create(CategoriesApi::class.java)
             purchasesApiInternal = authenticatedMoshiRetrofit.create(PurchasesApi::class.java)

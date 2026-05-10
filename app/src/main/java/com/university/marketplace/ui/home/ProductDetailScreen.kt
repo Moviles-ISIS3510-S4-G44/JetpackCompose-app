@@ -307,12 +307,6 @@ private fun ListingDetailBody(
     listing: ListingUiModel,
     onNavigateToSellerProfile: (String, String) -> Unit
 ) {
-    val displaySellerName = if (listing.sellerName.length > 20) {
-        "Seller " + (listing.sellerName.split("-").firstOrNull()?.uppercase() ?: listing.sellerName.take(8))
-    } else {
-        listing.sellerName
-    }
-
     Column(modifier = Modifier.padding(20.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
@@ -358,7 +352,7 @@ private fun ListingDetailBody(
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(modifier = Modifier.size(48.dp).clip(CircleShape).background(Color.LightGray))
             Column(modifier = Modifier.padding(start = 12.dp).weight(1f)) {
-                Text(displaySellerName, fontWeight = FontWeight.Bold)
+                Text(listing.sellerName, fontWeight = FontWeight.Bold)
                 Text("University Student", fontSize = 12.sp, color = Color.Gray)
             }
             TextButton(onClick = { onNavigateToSellerProfile(listing.sellerId, listing.sellerName) }) {

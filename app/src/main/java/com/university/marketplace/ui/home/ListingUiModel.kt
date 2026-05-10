@@ -13,7 +13,7 @@ data class ListingUiModel(
     val latitude: Double? = null,
     val longitude: Double? = null,
     val condition: String = "Used",
-    val sellerName: String = "Alex Johnson",
+    val sellerName: String = "Seller",
     val locationName: String = "Campus",
     val distance: String? = null
 )

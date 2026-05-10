@@ -4,7 +4,9 @@ import android.content.Context
 import com.university.marketplace.data.CategoriesRepository
 import com.university.marketplace.data.ChatRepositoryImpl
 import com.university.marketplace.data.DefaultInteractionsRepository
+import com.university.marketplace.data.DefaultProfileVisitsRepository
 import com.university.marketplace.data.InteractionsRepository
+import com.university.marketplace.data.ProfileVisitsRepository
 import com.university.marketplace.data.FavoriteRepositoryImpl
 import com.university.marketplace.data.ListingsRepository
 import com.university.marketplace.data.PurchasesRepository
@@ -36,6 +38,7 @@ interface AppContainer {
     val categoryRepository: CategoryRepository
     val purchaseRepository: PurchaseRepository
     val interactionsRepository: InteractionsRepository
+    val profileVisitsRepository: ProfileVisitsRepository
     val chatRepository: ChatRepository
     val locationRepository: LocationRepository
     val getActiveListingsUseCase: GetActiveListingsUseCase
@@ -89,6 +92,10 @@ class DefaultAppContainer(context: Context) : AppContainer {
 
     override val interactionsRepository: InteractionsRepository by lazy {
         DefaultInteractionsRepository(api = NetworkModule.interactionsApi)
+    }
+
+    override val profileVisitsRepository: ProfileVisitsRepository by lazy {
+        DefaultProfileVisitsRepository(api = NetworkModule.profileVisitsApi)
     }
 
     override val getActiveListingsUseCase: GetActiveListingsUseCase by lazy {

@@ -12,6 +12,8 @@ import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 data class ListingEntity(
     @PrimaryKey val id: String,
     val sellerId: String,
+    val sellerName: String?,
+    val sellerRating: Int?,
     val categoryId: String,
     val title: String,
     val description: String,
@@ -35,6 +37,8 @@ fun ListingEntity.toDomain(): Listing {
     return Listing(
         id = id,
         sellerId = sellerId,
+        sellerName = sellerName,
+        sellerRating = sellerRating,
         categoryId = categoryId,
         title = title,
         description = description,
@@ -57,6 +61,8 @@ fun Listing.toEntity(embedding: FloatArray? = null): ListingEntity {
     return ListingEntity(
         id = id,
         sellerId = sellerId,
+        sellerName = sellerName,
+        sellerRating = sellerRating,
         categoryId = categoryId,
         title = title,
         description = description,

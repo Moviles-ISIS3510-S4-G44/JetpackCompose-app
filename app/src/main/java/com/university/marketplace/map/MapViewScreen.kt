@@ -36,6 +36,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -388,9 +389,11 @@ private fun ListingSummaryCard(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "• ${listing.category}",
+                        text = "• ${listing.sellerName}",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MarketplaceGray
+                        color = MarketplaceGray,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
                 Spacer(modifier = Modifier.height(8.dp))

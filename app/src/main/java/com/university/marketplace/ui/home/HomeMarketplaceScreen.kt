@@ -64,6 +64,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -465,7 +466,9 @@ fun FeaturedProductCard(listing: ListingUiModel, onClick: () -> Unit) {
                     contentScale = ContentScale.Crop
                 )
                 Column(modifier = Modifier.padding(8.dp)) {
-                    Text(text = listing.name, fontSize = 14.sp, maxLines = 2, minLines = 2)
+                    Text(text = listing.name, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(text = "By ${listing.sellerName}", fontSize = 11.sp, color = Color.Gray, maxLines = 1)
+                    Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = "$ ${String.format(Locale.US, "%,.0f", listing.price).replace(',', '.')}",
                         fontSize = 16.sp,
@@ -515,6 +518,8 @@ fun SearchResultCard(listing: ListingUiModel, onClick: () -> Unit) {
             Spacer(modifier = Modifier.width(16.dp))
             Column {
                 Text(text = listing.name, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                Text(text = "Seller: ${listing.sellerName}", fontSize = 12.sp, color = Color.Gray)
+                Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = "$ ${String.format(Locale.US, "%,.0f", listing.price).replace(',', '.')}",
                     color = MarketplaceYellow,

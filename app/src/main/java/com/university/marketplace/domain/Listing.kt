@@ -3,6 +3,8 @@ package com.university.marketplace.domain
 data class Listing(
     val id: String,
     val sellerId: String,
+    val sellerName: String? = null,
+    val sellerRating: Int? = null,
     val categoryId: String,
     val title: String,
     val description: String,

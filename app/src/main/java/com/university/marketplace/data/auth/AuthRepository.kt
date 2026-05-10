@@ -12,6 +12,7 @@ interface AuthRepository {
     suspend fun login(email: String, password: String, persistSession: Boolean): AuthenticatedUser
     suspend fun signup(name: String, email: String, password: String, persistSession: Boolean): AuthenticatedUser
     suspend fun getCurrentUser(): AuthenticatedUser
+    suspend fun getUserProfile(userId: String): AuthenticatedUser
     suspend fun logout()
     suspend fun refreshAccessToken(): String
     fun hasActiveSession(): Boolean
@@ -83,6 +84,18 @@ class DefaultAuthRepository(
             sessionStorage.clear()
             throw unauthorized
         }
+    }
+
+    override suspend fun getUserProfile(userId: String): AuthenticatedUser = withContext(Dispatchers.IO) {
+        val response = apiService.getUserProfile(userId)
+        if (!response.isSuccessful) {
+            throw buildAuthException(
+                statusCode = response.code(),
+                errorBody = response.errorBody()?.string()
+            )
+        }
+        response.body()?.toDomain()
+            ?: throw AuthException("The server did not return user information.")
     }
 
     override suspend fun logout() = withContext(Dispatchers.IO) {

@@ -5,6 +5,8 @@ import com.squareup.moshi.Json
 data class ListingDto(
     val id: String,
     @Json(name = "seller_id") val sellerId: String,
+    @Json(name = "seller_name") val sellerName: String? = null,
+    @Json(name = "seller_rating") val sellerRating: Int? = null,
     @Json(name = "category_id") val categoryId: String,
     val title: String,
     val description: String,

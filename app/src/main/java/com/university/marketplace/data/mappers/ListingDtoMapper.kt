@@ -25,6 +25,8 @@ fun ListingDto.toDomain(): Listing {
     return Listing(
         id = id,
         sellerId = sellerId,
+        sellerName = sellerName,
+        sellerRating = sellerRating,
         categoryId = categoryId,
         title = title,
         description = description,
