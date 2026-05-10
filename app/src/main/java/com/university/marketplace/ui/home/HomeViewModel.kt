@@ -19,7 +19,6 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
-import java.util.Locale
 import kotlin.math.max
 
 class HomeViewModel(
@@ -59,12 +58,25 @@ class HomeViewModel(
         observeListings()
         observeSearch()
         loadListings()
+        
+        // Use a default location for immediate UI feedback (Bogotá center)
+        userLocation = Location("default").apply {
+            latitude = 4.601
+            longitude = -74.065
+        }
+        
         refreshUserLocation()
     }
 
     fun refreshUserLocation() {
         viewModelScope.launch {
-            locationRepository.getLastKnownLocation()?.let { loc ->
+            val loc = try {
+                locationRepository.getLastKnownLocation()
+            } catch (e: Exception) {
+                null
+            }
+            
+            if (loc != null) {
                 userLocation = Location("user").apply {
                     latitude = loc.latitude
                     longitude = loc.longitude
@@ -176,26 +188,11 @@ class HomeViewModel(
             .toList()
 
         val weighted = applyUserBehaviorWeights(filtered)
-        updateSections(weighted.map { it.toUiModelWithDistance() })
-    }
-
-    private fun Listing.toUiModelWithDistance(): ListingUiModel {
-        val uiModel = toUiModel()
-        val distanceStr = if (latitude != null && longitude != null && userLocation != null) {
-            val dest = Location("dest").apply {
-                latitude = this@toUiModelWithDistance.latitude
-                longitude = this@toUiModelWithDistance.longitude
-            }
-            val distanceMeters = userLocation!!.distanceTo(dest)
-            if (distanceMeters < 1000) {
-                "Aprox. ${distanceMeters.toInt()} m"
-            } else {
-                String.format(Locale.US, "Aprox. %.1f km", distanceMeters / 1000f)
-            }
-        } else {
-            null
+        if (weighted.isNotEmpty()) {
+            val first = weighted.first()
+            android.util.Log.d("HomeViewModel", "Mapping item ${first.title}: object=$first, userLoc=${userLocation != null}")
         }
-        return uiModel.copy(distance = distanceStr)
+        updateSections(weighted.map { it.toUiModel(userLocation) })
     }
 
     private fun applyUserBehaviorWeights(listings: List<Listing>): List<Listing> {

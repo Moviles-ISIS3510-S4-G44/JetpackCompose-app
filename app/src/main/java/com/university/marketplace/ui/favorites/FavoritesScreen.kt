@@ -23,8 +23,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.university.marketplace.ui.common.DistanceLabel
 import com.university.marketplace.ui.home.ListingUiModel
 import com.university.marketplace.ui.theme.MarketplaceYellow
+import androidx.compose.material.icons.filled.LocationOn
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -104,7 +106,8 @@ fun FavoriteListingItem(listing: ListingUiModel, onClick: () -> Unit) {
             Column(modifier = Modifier.padding(start = 12.dp).weight(1f)) {
                 Text(listing.name, fontWeight = FontWeight.Bold, maxLines = 1)
                 Text("$ ${listing.price.toInt()}", color = MarketplaceYellow, fontWeight = FontWeight.ExtraBold)
-                Text(listing.locationName, fontSize = 12.sp, color = Color.Gray)
+                Spacer(modifier = Modifier.height(4.dp))
+                DistanceLabel(distance = listing.distance)
             }
         }
     }
@@ -128,6 +131,8 @@ fun RecommendationCard(listing: ListingUiModel, onClick: () -> Unit) {
             Column(modifier = Modifier.padding(8.dp)) {
                 Text(listing.name, fontWeight = FontWeight.Bold, maxLines = 1, fontSize = 14.sp)
                 Text("$ ${listing.price.toInt()}", color = MarketplaceYellow, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(4.dp))
+                DistanceLabel(distance = listing.distance)
             }
         }
     }

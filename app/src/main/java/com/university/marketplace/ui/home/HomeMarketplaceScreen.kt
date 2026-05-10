@@ -63,16 +63,19 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import coil.compose.AsyncImage
 import com.university.marketplace.domain.Category
+import com.university.marketplace.ui.common.DistanceLabel
 import com.university.marketplace.ui.common.OfflineBanner
 import com.university.marketplace.ui.common.rememberOfflineBannerController
 import com.university.marketplace.ui.theme.MarketplaceDark
 import com.university.marketplace.ui.theme.MarketplaceWhite
 import com.university.marketplace.ui.theme.MarketplaceYellow
+import androidx.compose.material.icons.filled.LocationOn
 import java.util.Locale
 
 @Composable
@@ -358,45 +361,45 @@ fun SectionTitle(title: String) {
 
 @Composable
 fun FeaturedProductCard(listing: ListingUiModel, onClick: () -> Unit) {
-    Column(modifier = Modifier.width(160.dp)) {
-        DistanceLabel(distance = listing.distance)
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable { onClick() },
-            shape = RoundedCornerShape(8.dp),
-            colors = CardDefaults.cardColors(containerColor = MarketplaceWhite),
-            elevation = CardDefaults.cardElevation(2.dp)
-        ) {
-            Box {
-                Column {
-                    AsyncImage(
-                        model = listing.imageUrl,
-                        contentDescription = null,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(160.dp),
-                        contentScale = ContentScale.Crop
-                    )
-                    Column(modifier = Modifier.padding(8.dp)) {
-                        Text(text = listing.name, fontSize = 14.sp, maxLines = 2, minLines = 2)
-                        Text(
-                            text = "$ ${String.format(Locale.US, "%,.0f", listing.price).replace(',', '.')}",
-                            fontSize = 16.sp
-                        )
-                    }
-                }
-                Surface(
-                    modifier = Modifier.padding(8.dp),
-                    color = MarketplaceYellow,
-                    shape = RoundedCornerShape(12.dp)
-                ) {
+    Card(
+        modifier = Modifier
+            .width(160.dp)
+            .clickable { onClick() },
+        shape = RoundedCornerShape(8.dp),
+        colors = CardDefaults.cardColors(containerColor = MarketplaceWhite),
+        elevation = CardDefaults.cardElevation(2.dp)
+    ) {
+        Box {
+            Column {
+                AsyncImage(
+                    model = listing.imageUrl,
+                    contentDescription = null,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(160.dp),
+                    contentScale = ContentScale.Crop
+                )
+                Column(modifier = Modifier.padding(8.dp)) {
+                    Text(text = listing.name, fontSize = 14.sp, maxLines = 2, minLines = 2)
                     Text(
-                        text = "Destacado",
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-                        fontSize = 10.sp
+                        text = "$ ${String.format(Locale.US, "%,.0f", listing.price).replace(',', '.')}",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold
                     )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    DistanceLabel(distance = listing.distance)
                 }
+            }
+            Surface(
+                modifier = Modifier.padding(8.dp),
+                color = MarketplaceYellow,
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text(
+                    text = "Destacado",
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                    fontSize = 10.sp
+                )
             }
         }
     }
@@ -404,52 +407,39 @@ fun FeaturedProductCard(listing: ListingUiModel, onClick: () -> Unit) {
 
 @Composable
 fun SearchResultCard(listing: ListingUiModel, onClick: () -> Unit) {
-    Column(
+    Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 4.dp)
+            .clickable { onClick() },
+        colors = CardDefaults.cardColors(containerColor = MarketplaceWhite),
+        elevation = CardDefaults.cardElevation(1.dp)
     ) {
-        DistanceLabel(distance = listing.distance)
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable { onClick() },
-            colors = CardDefaults.cardColors(containerColor = MarketplaceWhite),
-            elevation = CardDefaults.cardElevation(1.dp)
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
-                modifier = Modifier.padding(12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                AsyncImage(
-                    model = listing.imageUrl,
-                    contentDescription = null,
-                    modifier = Modifier
-                        .size(80.dp)
-                        .clip(RoundedCornerShape(8.dp)),
-                    contentScale = ContentScale.Crop
+            AsyncImage(
+                model = listing.imageUrl,
+                contentDescription = null,
+                modifier = Modifier
+                    .size(80.dp)
+                    .clip(RoundedCornerShape(8.dp)),
+                contentScale = ContentScale.Crop
+            )
+            Spacer(modifier = Modifier.width(16.dp))
+            Column {
+                Text(text = listing.name, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                Text(
+                    text = "$ ${String.format(Locale.US, "%,.0f", listing.price).replace(',', '.')}",
+                    color = MarketplaceYellow,
+                    fontWeight = FontWeight.Bold
                 )
-                Spacer(modifier = Modifier.width(16.dp))
-                Column {
-                    Text(text = listing.name, fontSize = 16.sp)
-                    Text(
-                        text = "$ ${String.format(Locale.US, "%,.0f", listing.price).replace(',', '.')}",
-                        color = Color.Gray
-                    )
-                }
+                Spacer(modifier = Modifier.height(4.dp))
+                DistanceLabel(distance = listing.distance)
             }
         }
     }
-}
-
-@Composable
-private fun DistanceLabel(distance: String?) {
-    Text(
-        text = distance ?: "Aprox. distancia no disponible",
-        fontSize = 12.sp,
-        color = Color.Gray,
-        modifier = Modifier.padding(bottom = 6.dp)
-    )
 }
 
 private fun hasLocationPermission(context: Context): Boolean {

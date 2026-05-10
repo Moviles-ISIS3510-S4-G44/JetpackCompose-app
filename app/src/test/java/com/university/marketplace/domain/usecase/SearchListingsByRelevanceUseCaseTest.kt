@@ -87,7 +87,8 @@ class SearchListingsByRelevanceUseCaseTest {
             images = emptyList(),
             status = "active",
             latitude = null,
-            longitude = null
+            longitude = null,
+            locationName = null
         )
     }
 

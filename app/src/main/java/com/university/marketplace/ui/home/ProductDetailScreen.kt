@@ -25,7 +25,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.listSaver
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
@@ -38,16 +37,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import coil.compose.AsyncImage
-import com.google.android.gms.location.LocationServices
-import com.university.marketplace.map.DistanceUtils
+import com.university.marketplace.ui.common.DistanceLabel
 import com.university.marketplace.ui.common.isWideScreen
 import com.university.marketplace.ui.theme.*
-import java.util.Locale
-
-private val UserCoordinatesSaver = listSaver<Pair<Double, Double>?, Double>(
-    save = { value -> value?.let { listOf(it.first, it.second) } ?: emptyList() },
-    restore = { list -> if (list.size == 2) list[0] to list[1] else null }
-)
 
 @SuppressLint("MissingPermission")
 @OptIn(ExperimentalMaterial3Api::class)
@@ -62,29 +54,13 @@ fun ProductDetailScreen(
     val uiState by viewModel.uiState.collectAsState()
     val purchaseState by viewModel.purchaseState.collectAsState()
     val context = LocalContext.current
-    val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
-    var userCoordinates by rememberSaveable(stateSaver = UserCoordinatesSaver) {
-        mutableStateOf<Pair<Double, Double>?>(null)
-    }
-
-    val updateLocation: () -> Unit = {
-        if (
-            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
-            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
-        ) {
-            fusedLocationClient.lastLocation
-                .addOnSuccessListener { location ->
-                    if (location != null) {
-                        userCoordinates = location.latitude to location.longitude
-                    }
-                }
-        }
-    }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
-    ) {
-        updateLocation()
+    ) { results ->
+        if (results.values.any { it }) {
+            viewModel.refreshUserLocation()
+        }
     }
 
     var showPurchaseDialog by remember { mutableStateOf(false) }
@@ -116,7 +92,6 @@ fun ProductDetailScreen(
     }
 
     LaunchedEffect(Unit) {
-        if (userCoordinates != null) return@LaunchedEffect
         val hasFineLocation = ContextCompat.checkSelfPermission(
             context,
             Manifest.permission.ACCESS_FINE_LOCATION
@@ -128,9 +103,7 @@ fun ProductDetailScreen(
         ) == PackageManager.PERMISSION_GRANTED
 
         if (hasFineLocation || hasCoarseLocation) {
-            fusedLocationClient.lastLocation.addOnSuccessListener { location ->
-                location?.let { userCoordinates = it.latitude to it.longitude }
-            }
+            viewModel.refreshUserLocation()
         } else {
             permissionLauncher.launch(
                 arrayOf(
@@ -259,30 +232,13 @@ fun ProductDetailScreen(
                 }
                 is ListingDetailUiState.Content.Success -> {
                     val listing = state.listing
-                    val distanceText = remember(listing, userCoordinates) {
-                        if (listing.latitude != null && listing.longitude != null) {
-                            userCoordinates?.let { (lat, lon) ->
-                                val distanceKm = DistanceUtils.calculateDistance(
-                                    lat,
-                                    lon,
-                                    listing.latitude,
-                                    listing.longitude
-                                )
-                                String.format(Locale.US, "%s • %.1f km away", listing.locationName, distanceKm)
-                            } ?: "${listing.locationName} • distance unavailable"
-                        } else {
-                            "${listing.locationName} • location unavailable"
-                        }
-                    }
                     if (isWideScreen()) {
                         WideListingDetail(
-                            listing = listing,
-                            distanceText = distanceText
+                            listing = listing
                         )
                     } else {
                         CompactListingDetail(
-                            listing = listing,
-                            distanceText = distanceText
+                            listing = listing
                         )
                     }
                 }
@@ -293,8 +249,7 @@ fun ProductDetailScreen(
 
 @Composable
 private fun CompactListingDetail(
-    listing: ListingUiModel,
-    distanceText: String
+    listing: ListingUiModel
 ) {
     Column(
         modifier = Modifier
@@ -310,14 +265,13 @@ private fun CompactListingDetail(
                 .height(350.dp),
             contentScale = ContentScale.Crop
         )
-        ListingDetailBody(listing = listing, distanceText = distanceText)
+        ListingDetailBody(listing = listing)
     }
 }
 
 @Composable
 private fun WideListingDetail(
-    listing: ListingUiModel,
-    distanceText: String
+    listing: ListingUiModel
 ) {
     Row(
         modifier = Modifier
@@ -338,15 +292,14 @@ private fun WideListingDetail(
                 .fillMaxHeight()
                 .verticalScroll(rememberScrollState())
         ) {
-            ListingDetailBody(listing = listing, distanceText = distanceText)
+            ListingDetailBody(listing = listing)
         }
     }
 }
 
 @Composable
 private fun ListingDetailBody(
-    listing: ListingUiModel,
-    distanceText: String
+    listing: ListingUiModel
 ) {
     Column(modifier = Modifier.padding(20.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -374,7 +327,14 @@ private fun ListingDetailBody(
             color = MarketplaceYellow,
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.ExtraBold,
-            modifier = Modifier.padding(vertical = 8.dp)
+            modifier = Modifier.padding(top = 8.dp)
+        )
+
+        DistanceLabel(
+            distance = listing.distance,
+            modifier = Modifier.padding(bottom = 8.dp),
+            iconSize = 16.dp,
+            fontSize = 14.sp
         )
 
         HorizontalDivider(
@@ -401,17 +361,5 @@ private fun ListingDetailBody(
             color = Color.DarkGray,
             lineHeight = 22.sp
         )
-
-        Spacer(modifier = Modifier.height(20.dp))
-
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Default.LocationOn, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(18.dp))
-            Text(
-                text = distanceText,
-                modifier = Modifier.padding(start = 8.dp),
-                color = Color.Gray,
-                fontSize = 14.sp
-            )
-        }
     }
 }

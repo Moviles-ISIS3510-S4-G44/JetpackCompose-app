@@ -36,11 +36,15 @@ class MarketplaceViewModelFactory(
                     getListingByIdUseCase = container.getListingByIdUseCase,
                     interactionsRepository = container.interactionsRepository,
                     favoriteRepository = container.favoriteRepository,
+                    locationRepository = container.locationRepository,
                     createPurchaseUseCase = container.createPurchaseUseCase
                 ) as T
             }
             modelClass.isAssignableFrom(MapViewModel::class.java) -> {
-                MapViewModel(getListingByIdUseCase = container.getListingByIdUseCase) as T
+                MapViewModel(
+                    getListingByIdUseCase = container.getListingByIdUseCase,
+                    locationRepository = container.locationRepository
+                ) as T
             }
             modelClass.isAssignableFrom(CreateListingViewModel::class.java) -> {
                 CreateListingViewModel(
@@ -71,7 +75,8 @@ class MarketplaceViewModelFactory(
             modelClass.isAssignableFrom(FavoritesViewModel::class.java) -> {
                 FavoritesViewModel(
                     favoriteRepository = container.favoriteRepository,
-                    listingRepository = container.listingRepository
+                    listingRepository = container.listingRepository,
+                    locationRepository = container.locationRepository
                 ) as T
             }
             else -> throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")

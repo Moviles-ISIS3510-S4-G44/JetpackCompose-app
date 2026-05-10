@@ -21,6 +21,7 @@ data class ListingEntity(
     val status: String,
     val latitude: Double?,
     val longitude: Double?,
+    val locationName: String?,
     val embedding: FloatArray?,
     val updatedAt: Long = System.currentTimeMillis()
 )
@@ -42,7 +43,8 @@ fun ListingEntity.toDomain(): Listing {
         images = images,
         status = status,
         latitude = latitude,
-        longitude = longitude
+        longitude = longitude,
+        locationName = locationName
     )
 }
 
@@ -64,6 +66,7 @@ fun Listing.toEntity(embedding: FloatArray? = null): ListingEntity {
         status = status,
         latitude = latitude,
         longitude = longitude,
+        locationName = locationName,
         embedding = embedding
     )
 }

@@ -3,6 +3,7 @@ package com.university.marketplace.ui.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.university.marketplace.data.InteractionsRepository
+import com.university.marketplace.data.location.LocationRepository
 import com.university.marketplace.data.toUserFriendlyMessage
 import com.university.marketplace.domain.FavoriteRepository
 import com.university.marketplace.domain.usecase.CreatePurchaseUseCase
@@ -18,7 +19,8 @@ import kotlinx.coroutines.launch
 
 data class ListingDetailUiState(
     val content: Content = Content.Loading,
-    val isFavorited: Boolean = false
+    val isFavorited: Boolean = false,
+    val userLocation: Pair<Double, Double>? = null
 ) {
     sealed interface Content {
         object Loading : Content
@@ -38,6 +40,7 @@ class ListingDetailViewModel(
     private val getListingByIdUseCase: GetListingByIdUseCase,
     private val interactionsRepository: InteractionsRepository,
     private val favoriteRepository: FavoriteRepository,
+    private val locationRepository: LocationRepository,
     private val createPurchaseUseCase: CreatePurchaseUseCase? = null
 ) : ViewModel() {
 
@@ -48,6 +51,7 @@ class ListingDetailViewModel(
     val purchaseState: StateFlow<PurchaseUiState> = _purchaseState.asStateFlow()
 
     fun loadListing(id: String) {
+        refreshUserLocation()
         favoriteRepository.isFavorite(id)
             .onEach { isFav ->
                 _uiState.update { it.copy(isFavorited = isFav) }
@@ -58,7 +62,13 @@ class ListingDetailViewModel(
             _uiState.update { it.copy(content = ListingDetailUiState.Content.Loading) }
             try {
                 val listing = getListingByIdUseCase(id)
-                _uiState.update { it.copy(content = ListingDetailUiState.Content.Success(listing.toUiModel())) }
+                val userLoc = _uiState.value.userLocation?.let { (lat, lon) ->
+                    android.location.Location("user").apply {
+                        latitude = lat
+                        longitude = lon
+                    }
+                }
+                _uiState.update { it.copy(content = ListingDetailUiState.Content.Success(listing.toUiModel(userLoc))) }
                 viewModelScope.launch {
                     interactionsRepository.registerVisit(listing.id)
                 }
@@ -67,6 +77,50 @@ class ListingDetailViewModel(
                     it.copy(content = ListingDetailUiState.Content.Error(
                         e.toUserFriendlyMessage(fallback = "Failed to load listing")
                     ))
+                }
+            }
+        }
+    }
+
+    fun refreshUserLocation() {
+        viewModelScope.launch {
+            locationRepository.getLastKnownLocation()?.let { loc ->
+                val newLoc = loc.latitude to loc.longitude
+                _uiState.update { state ->
+                    val updatedContent = if (state.content is ListingDetailUiState.Content.Success) {
+                        val androidLoc = android.location.Location("user").apply {
+                            latitude = loc.latitude
+                            longitude = loc.longitude
+                        }
+                        // We need the original domain Listing here, but we only have ListingUiModel
+                        // This is a bit tricky. Maybe we should store the domain listing too?
+                        // Or just update the distance in the UI model.
+                        val currentListing = state.content.listing
+                        // We can't easily re-calculate from UiModel because it doesn't have all data.
+                        // Actually, ListingUiModel HAS latitude and longitude!
+                        
+                        val baseLocation = currentListing.locationName
+                        val dest = android.location.Location("dest").apply {
+                            latitude = currentListing.latitude ?: 0.0
+                            longitude = currentListing.longitude ?: 0.0
+                        }
+                        val distanceStr = if (currentListing.latitude != null && currentListing.longitude != null) {
+                            val distanceMeters = androidLoc.distanceTo(dest)
+                            if (distanceMeters < 1000) {
+                                "$baseLocation • ${distanceMeters.toInt()}m"
+                            } else {
+                                java.util.Locale.US.let { locale ->
+                                    String.format(locale, "%s • %.1f km", baseLocation, distanceMeters / 1000f)
+                                }
+                            }
+                        } else {
+                            baseLocation
+                        }
+                        ListingDetailUiState.Content.Success(currentListing.copy(distance = distanceStr))
+                    } else {
+                        state.content
+                    }
+                    state.copy(userLocation = newLoc, content = updatedContent)
                 }
             }
         }

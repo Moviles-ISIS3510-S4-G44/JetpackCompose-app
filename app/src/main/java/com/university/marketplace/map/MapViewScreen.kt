@@ -42,8 +42,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.listSaver
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -80,11 +78,6 @@ import java.util.Locale
 
 private val DEFAULT_MAP_CENTER = LatLng(4.601, -74.065)
 
-private val LatLngSaver = listSaver<LatLng?, Double>(
-    save = { value -> value?.let { listOf(it.latitude, it.longitude) } ?: emptyList() },
-    restore = { list -> if (list.size == 2) LatLng(list[0], list[1]) else null }
-)
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MapViewScreen(
@@ -98,34 +91,17 @@ fun MapViewScreen(
     val offlineBannerController = rememberOfflineBannerController(isOnline)
 
     val context = LocalContext.current
-    val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
-    var userLocation by rememberSaveable(stateSaver = LatLngSaver) {
-        mutableStateOf<LatLng?>(null)
-    }
-
-    val updateUserLocation: () -> Unit = {
-        if (
-            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
-            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
-        ) {
-            fusedLocationClient.lastLocation
-                .addOnSuccessListener { loc ->
-                    if (loc != null) {
-                        userLocation = LatLng(loc.latitude, loc.longitude)
-                    }
-                }
-        }
-    }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
-    ) {
-        updateUserLocation()
+    ) { results ->
+        if (results.values.any { it }) {
+            viewModel.refreshUserLocation()
+        }
     }
 
     LaunchedEffect(productId, isOnline) {
-        val currentState = uiState
-        if (currentState is MapUiState.Success) return@LaunchedEffect
+        if (uiState.content is MapUiState.Content.Success) return@LaunchedEffect
         if (!isOnline) {
             viewModel.showOfflineState()
             return@LaunchedEffect
@@ -135,7 +111,6 @@ fun MapViewScreen(
     }
 
     LaunchedEffect(Unit) {
-        if (userLocation != null) return@LaunchedEffect
         val hasFineLocation = ContextCompat.checkSelfPermission(
             context,
             Manifest.permission.ACCESS_FINE_LOCATION
@@ -147,7 +122,7 @@ fun MapViewScreen(
         ) == PackageManager.PERMISSION_GRANTED
 
         if (hasFineLocation || hasCoarseLocation) {
-            updateUserLocation()
+            viewModel.refreshUserLocation()
         } else {
             permissionLauncher.launch(
                 arrayOf(
@@ -158,10 +133,9 @@ fun MapViewScreen(
         }
     }
 
-    val appBarTitle = if (uiState is MapUiState.Success) {
-        (uiState as MapUiState.Success).listing.name
-    } else {
-        "Listing Location"
+    val appBarTitle = when (val content = uiState.content) {
+        is MapUiState.Content.Success -> content.listing.name
+        else -> "Listing Location"
     }
 
     Scaffold(
@@ -195,47 +169,70 @@ fun MapViewScreen(
             )
 
             Box(modifier = Modifier.weight(1f)) {
-                when (val state = uiState) {
-                    is MapUiState.Loading -> {
+                when (val state = uiState.content) {
+                    is MapUiState.Content.Loading -> {
                         CircularProgressIndicator(
                             modifier = Modifier.align(Alignment.Center),
                             color = MarketplaceYellow
                         )
                     }
-                    is MapUiState.Error -> {
+                    is MapUiState.Content.Error -> {
                         Text(
                             text = state.message,
                             color = Color.Red,
                             modifier = Modifier.align(Alignment.Center)
                         )
                     }
-                    is MapUiState.Success -> {
+                    is MapUiState.Content.Success -> {
                         val listing = state.listing
+                        val userLocationPair = uiState.userLocation
+                        val userLocation = userLocationPair?.let { LatLng(it.first, it.second) }
+                        
                         val listingLocation = remember(listing.latitude, listing.longitude) {
                             listing.latitude?.let { lat ->
                                 listing.longitude?.let { lng -> LatLng(lat, lng) }
                             }
                         }
-                        val distanceText = remember(userLocation, listingLocation) {
-                            userLocation?.let { current ->
-                                listingLocation?.let {
-                                    val distanceKm = DistanceUtils.calculateDistance(
-                                        current.latitude,
-                                        current.longitude,
-                                        it.latitude,
-                                        it.longitude
-                                    )
-                                    String.format(Locale.US, "Approx. %.1f km from you", distanceKm)
+                        
+                        val distanceOnlyText = remember(userLocation, listingLocation) {
+                            if (userLocation != null && listingLocation != null) {
+                                val distanceKm = DistanceUtils.calculateDistance(
+                                    userLocation.latitude,
+                                    userLocation.longitude,
+                                    listingLocation.latitude,
+                                    listingLocation.longitude
+                                )
+                                if (distanceKm < 1.0) {
+                                    "${(distanceKm * 1000).toInt()} m"
+                                } else {
+                                    String.format(Locale.US, "%.1f km", distanceKm)
                                 }
-                            } ?: "Location unavailable"
+                            } else null
                         }
-                        var isMapLoaded by remember(listing.id) { mutableStateOf(false) }
+
+                        val distanceText = remember(listing.locationName, distanceOnlyText) {
+                            if (distanceOnlyText != null) {
+                                "${listing.locationName} • $distanceOnlyText away"
+                            } else {
+                                listing.locationName
+                            }
+                        }
 
                         val cameraPositionState = rememberCameraPositionState {
                             position = CameraPosition.fromLatLngZoom(
                                 listingLocation ?: DEFAULT_MAP_CENTER,
                                 15f
                             )
+                        }
+
+                        LaunchedEffect(userLocation, listingLocation) {
+                            if (userLocation != null && listingLocation != null) {
+                                val bounds = LatLngBounds.builder()
+                                    .include(userLocation)
+                                    .include(listingLocation)
+                                    .build()
+                                cameraPositionState.animate(CameraUpdateFactory.newLatLngBounds(bounds, 150))
+                            }
                         }
 
                         if (isWideScreen()) {
@@ -250,6 +247,7 @@ fun MapViewScreen(
                                         listingLocation = listingLocation,
                                         userLocation = userLocation,
                                         listing = listing,
+                                        distanceText = distanceOnlyText,
                                         modifier = Modifier.fillMaxSize()
                                     )
                                 }
@@ -273,6 +271,7 @@ fun MapViewScreen(
                                 listingLocation = listingLocation,
                                 userLocation = userLocation,
                                 listing = listing,
+                                distanceText = distanceOnlyText,
                                 modifier = Modifier.fillMaxSize()
                             )
 
@@ -308,6 +307,7 @@ private fun MapContent(
     listingLocation: LatLng?,
     userLocation: LatLng?,
     listing: com.university.marketplace.ui.home.ListingUiModel,
+    distanceText: String?,
     modifier: Modifier = Modifier
 ) {
     GoogleMap(
@@ -319,14 +319,19 @@ private fun MapContent(
             Marker(
                 state = rememberMarkerState(position = it),
                 title = listing.name,
-                snippet = "$${listing.price.toInt()}"
+                snippet = if (distanceText != null) {
+                    "$${listing.price.toInt()} • $distanceText away"
+                } else {
+                    "$${listing.price.toInt()}"
+                }
             )
         }
 
         userLocation?.let {
             Marker(
                 state = rememberMarkerState(position = it),
-                title = "You"
+                title = "You",
+                icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE)
             )
         }
     }
