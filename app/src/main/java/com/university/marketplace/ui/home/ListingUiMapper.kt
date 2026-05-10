@@ -10,6 +10,7 @@ fun Listing.toUiModel(userLocation: Location? = null): ListingUiModel {
 
     return ListingUiModel(
         id = id,
+        sellerId = sellerId,
         name = title,
         price = price,
         imageUrl = images.firstOrNull().orEmpty(),

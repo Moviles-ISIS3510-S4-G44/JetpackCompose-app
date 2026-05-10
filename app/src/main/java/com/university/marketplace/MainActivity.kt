@@ -56,6 +56,8 @@ import com.university.marketplace.ui.favorites.FavoritesScreen
 import com.university.marketplace.ui.favorites.FavoritesViewModel
 import com.university.marketplace.ui.profile.MyListingsViewModel
 import com.university.marketplace.ui.profile.ProfileRoute
+import com.university.marketplace.ui.profile.OtherUserProfileScreen
+import com.university.marketplace.ui.profile.OtherUserProfileViewModel
 import com.university.marketplace.data.api.NetworkModule
 import com.university.marketplace.ui.chat.ChatScreen
 import com.university.marketplace.ui.chat.ChatViewModelFactory
@@ -290,9 +292,31 @@ fun AppNavigation(container: com.university.marketplace.di.AppContainer) {
                             }
                         }
                     } else null,
+                    onNavigateToSellerProfile = { sellerId, sellerName ->
+                        navController.navigate("other_profile/$sellerId?sellerName=${android.net.Uri.encode(sellerName)}")
+                    },
                     viewModel = detailViewModel
                 )
             }
+        }
+        composable(
+            route = "other_profile/{sellerId}?sellerName={sellerName}",
+            arguments = listOf(
+                navArgument("sellerId") { type = NavType.StringType },
+                navArgument("sellerName") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val sellerId = backStackEntry.arguments?.getString("sellerId") ?: ""
+            val sellerName = backStackEntry.arguments?.getString("sellerName") ?: ""
+            val otherUserProfileViewModel: OtherUserProfileViewModel = viewModel(factory = factory)
+            
+            OtherUserProfileScreen(
+                sellerId = sellerId,
+                sellerName = sellerName,
+                viewModel = otherUserProfileViewModel,
+                onBack = { navController.popBackStack() },
+                onNavigateToDetail = { id -> navController.navigate("product_detail/$id") }
+            )
         }
         composable("favorites") {
             val favoritesViewModel: FavoritesViewModel = viewModel(factory = factory)

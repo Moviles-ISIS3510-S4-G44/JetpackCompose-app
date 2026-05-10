@@ -17,6 +17,7 @@ interface ListingRepository {
     ): List<Listing>
     fun searchListingsFlow(query: String): Flow<List<Listing>>
     suspend fun getMyListings(): List<Listing>
+    suspend fun getListingsBySellerId(sellerId: String): List<Listing>
     suspend fun createListing(
         sellerId: String,
         categoryId: String,

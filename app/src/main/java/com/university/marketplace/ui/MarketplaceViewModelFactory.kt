@@ -9,6 +9,7 @@ import com.university.marketplace.ui.home.CreateListingViewModel
 import com.university.marketplace.ui.home.HomeViewModel
 import com.university.marketplace.ui.home.ListingDetailViewModel
 import com.university.marketplace.ui.profile.MyListingsViewModel
+import com.university.marketplace.ui.profile.OtherUserProfileViewModel
 import com.university.marketplace.ui.chat.ConversationListViewModel
 import com.university.marketplace.ui.favorites.FavoritesViewModel
 import com.university.marketplace.ui.purchases.PurchaseHistoryViewModel
@@ -56,6 +57,11 @@ class MarketplaceViewModelFactory(
             modelClass.isAssignableFrom(MyListingsViewModel::class.java) -> {
                 MyListingsViewModel(
                     getMyListingsUseCase = container.getMyListingsUseCase
+                ) as T
+            }
+            modelClass.isAssignableFrom(OtherUserProfileViewModel::class.java) -> {
+                OtherUserProfileViewModel(
+                    getListingsBySellerUseCase = container.getListingsBySellerUseCase
                 ) as T
             }
             modelClass.isAssignableFrom(PurchaseHistoryViewModel::class.java) -> {

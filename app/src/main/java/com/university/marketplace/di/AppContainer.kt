@@ -23,6 +23,7 @@ import com.university.marketplace.domain.usecase.CreatePurchaseUseCase
 import com.university.marketplace.domain.usecase.GetActiveListingsUseCase
 import com.university.marketplace.domain.usecase.GetFilteredListingsUseCase
 import com.university.marketplace.domain.usecase.GetListingByIdUseCase
+import com.university.marketplace.domain.usecase.GetListingsBySellerUseCase
 import com.university.marketplace.domain.usecase.GetMyListingsUseCase
 import com.university.marketplace.domain.usecase.GetMyPurchasesUseCase
 import com.university.marketplace.domain.usecase.GetSalesHistoryUseCase
@@ -39,6 +40,7 @@ interface AppContainer {
     val locationRepository: LocationRepository
     val getActiveListingsUseCase: GetActiveListingsUseCase
     val getListingByIdUseCase: GetListingByIdUseCase
+    val getListingsBySellerUseCase: GetListingsBySellerUseCase
     val searchListingsByRelevanceUseCase: SearchListingsByRelevanceUseCase
     val getFilteredListingsUseCase: GetFilteredListingsUseCase
     val getMyListingsUseCase: GetMyListingsUseCase
@@ -95,6 +97,10 @@ class DefaultAppContainer(context: Context) : AppContainer {
 
     override val getListingByIdUseCase: GetListingByIdUseCase by lazy {
         GetListingByIdUseCase(listingRepository)
+    }
+
+    override val getListingsBySellerUseCase: GetListingsBySellerUseCase by lazy {
+        GetListingsBySellerUseCase(listingRepository)
     }
 
     override val searchListingsByRelevanceUseCase: SearchListingsByRelevanceUseCase by lazy {
