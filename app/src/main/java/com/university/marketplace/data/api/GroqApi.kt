@@ -40,7 +40,7 @@ data class SearchIntent(
     val product_name: String?,
     val max_price: Double?,
     val category: String?,
-    val condition: String?, // "new" or "used"
-    val proximity_preference: Double?, // in km
-    val sort_order: String? // "relevance", "price_low", "price_high"
+    val condition: String?,
+    val proximity_preference: Double?,
+    val sort_order: String?
 )

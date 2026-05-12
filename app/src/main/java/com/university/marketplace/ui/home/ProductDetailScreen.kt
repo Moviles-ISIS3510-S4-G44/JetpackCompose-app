@@ -172,8 +172,8 @@ fun ProductDetailScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { /* Compartir */ }) { Icon(Icons.Outlined.Share, null) }
-                    IconButton(onClick = { /* Favoritos */ }) { Icon(Icons.Outlined.FavoriteBorder, null) }
+                    IconButton(onClick = { }) { Icon(Icons.Outlined.Share, null) }
+                    IconButton(onClick = { }) { Icon(Icons.Outlined.FavoriteBorder, null) }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White)
             )
@@ -233,7 +233,7 @@ fun ProductDetailScreen(
                                 color = MarketplaceWhite,
                                 border = androidx.compose.foundation.BorderStroke(1.dp, Color.LightGray)
                             ) {
-                                IconButton(onClick = { /* Guardar */ }) {
+                                IconButton(onClick = { }) {
                                     Icon(Icons.Default.BookmarkBorder, contentDescription = null)
                                 }
                             }

@@ -24,7 +24,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.launch
 import coil.compose.AsyncImage
 import com.university.marketplace.ui.common.isWideScreen
 import com.university.marketplace.ui.theme.*
@@ -44,7 +44,7 @@ fun CreateListingScreen(
     var title by rememberSaveable { mutableStateOf("") }
     var price by rememberSaveable { mutableStateOf("") }
     var description by rememberSaveable { mutableStateOf("") }
-    var selectedCondition by rememberSaveable { mutableStateOf("new") }
+    var selectedCondition by rememberSaveable { mutableStateOf("Nuevo") }
     var location by rememberSaveable { mutableStateOf("") }
     var imageUri by rememberSaveable(stateSaver = UriSaver) { mutableStateOf<Uri?>(null) }
     var categoryMenuExpanded by remember { mutableStateOf(false) }
@@ -63,6 +63,7 @@ fun CreateListingScreen(
     }
 
     val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
     LaunchedEffect(uiState) {
         if (uiState is CreateListingUiState.Error) {
             snackbarHostState.showSnackbar((uiState as CreateListingUiState.Error).message)
@@ -90,12 +91,47 @@ fun CreateListingScreen(
                 Button(
                     onClick = {
                         val priceInt = price.toIntOrNull() ?: 0
-                        val conditionApi = when (selectedCondition) {
-                            "Like New" -> "like_new"
-                            "Used" -> "used"
+                        val conditionApi = when (selectedCondition.lowercase()) {
+                            "como nuevo" -> "refurbished"
+                            "usado" -> "used"
                             else -> "new"
                         }
-                        val images = if (imageUri != null) listOf(imageUri.toString()) else emptyList()
+                        val rawImage = imageUri?.toString().orEmpty()
+                        val images = if (rawImage.startsWith("http://") || rawImage.startsWith("https://")) {
+                            listOf(rawImage)
+                        } else {
+                            emptyList()
+                        }
+
+                        if (selectedCategoryId.isBlank()) {
+                            coroutineScope.launch {
+                                snackbarHostState.showSnackbar("Selecciona una categoría")
+                            }
+                            return@Button
+                        }
+                        if (title.isBlank()) {
+                            coroutineScope.launch {
+                                snackbarHostState.showSnackbar("Ingresa un título")
+                            }
+                            return@Button
+                        }
+                        if (priceInt <= 0) {
+                            coroutineScope.launch {
+                                snackbarHostState.showSnackbar("Ingresa un precio válido")
+                            }
+                            return@Button
+                        }
+                        if (location.isBlank()) {
+                            coroutineScope.launch {
+                                snackbarHostState.showSnackbar("Ingresa una ubicación")
+                            }
+                            return@Button
+                        }
+                        if (imageUri != null && images.isEmpty()) {
+                            coroutineScope.launch {
+                                snackbarHostState.showSnackbar("La imagen local no se sube aún. Se enviará sin imagen.")
+                            }
+                        }
                         if (viewModel != null) {
                             viewModel.submit(
                                 categoryId = selectedCategoryId,

@@ -189,7 +189,17 @@ class DefaultAuthRepository(
         unauthorizedMessage: String = "We could not complete the request. Please try again."
     ): AuthException {
         val apiMessage: String? = errorBody?.let { body ->
-            runCatching { JSONObject(body).optString("detail").takeIf { it.isNotBlank() } }.getOrNull()
+            runCatching {
+                val json = JSONObject(body)
+                listOf("detail", "message", "error")
+                    .firstNotNullOfOrNull { key -> json.optString(key).takeIf { it.isNotBlank() } }
+            }.getOrNull()
+        }
+
+        if (!errorBody.isNullOrBlank()) {
+            Log.w(TAG, "Auth failed with HTTP $statusCode: $errorBody")
+        } else {
+            Log.w(TAG, "Auth failed with HTTP $statusCode and empty body")
         }
 
         val message: String =
@@ -199,7 +209,8 @@ class DefaultAuthRepository(
                 when (statusCode) {
                     401 -> unauthorizedMessage
                     409 -> "This email is already registered."
-                    else -> "We could not complete the request. Please try again."
+                    else -> errorBody?.takeIf { it.isNotBlank() }
+                        ?: "We could not complete the request. Please try again."
                 }
             }
 
