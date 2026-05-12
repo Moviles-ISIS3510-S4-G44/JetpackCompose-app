@@ -141,7 +141,6 @@ fun AppNavigation(container: com.university.marketplace.di.AppContainer) {
     }
 
     var lastNotifiedOnline by rememberSaveable { mutableStateOf<Boolean?>(null) }
-    var uiMessage by rememberSaveable { mutableStateOf<String?>(null) }
     var uiMessageIsOnline by rememberSaveable { mutableStateOf<Boolean?>(null) }
     var lastOfflineAt by rememberSaveable { mutableStateOf<Long?>(null) }
 
