@@ -1,6 +1,9 @@
 package com.university.marketplace.data.auth
 
 import android.content.Context
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 data class AuthSession(
     val sessionId: String?,
@@ -12,6 +15,13 @@ data class AuthSession(
 
 class AuthSessionStorage(context: Context) {
     private val preferences = context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
+
+    private val _sessionFlow = MutableStateFlow<AuthSession?>(null)
+    val sessionFlow: StateFlow<AuthSession?> = _sessionFlow.asStateFlow()
+
+    init {
+        _sessionFlow.value = getSession()
+    }
 
     fun saveSession(session: AuthSession, rememberAcrossRestarts: Boolean) {
         preferences.edit()
@@ -32,6 +42,7 @@ class AuthSessionStorage(context: Context) {
                 }
             }
             .apply()
+        _sessionFlow.value = session
     }
 
     fun updateTokens(session: AuthSession) {
@@ -80,6 +91,7 @@ class AuthSessionStorage(context: Context) {
             .remove(KEY_REFRESH_EXPIRES_AT)
             .remove(KEY_REMEMBER_ME)
             .apply()
+        _sessionFlow.value = null
     }
 
     fun clearIfNotRemembered() {

@@ -95,20 +95,32 @@ fun AppNavigation(container: com.university.marketplace.di.AppContainer) {
     val connectivityMonitor = remember { AndroidConnectivityMonitor(context.applicationContext) }
     val isOnline by connectivityMonitor.isOnline.collectAsState(initial = connectivityMonitor.isCurrentlyOnline())
     val authRepository = remember { AuthRepositoryFactory.create(context.applicationContext) }
+    val session by authRepository.sessionFlow.collectAsState(initial = null)
     val factory = remember(container, authRepository) { MarketplaceViewModelFactory(container, authRepository) }
     val coroutineScope = rememberCoroutineScope()
     val startDestination = if (authRepository.hasActiveSession()) "home" else "sign_in"
     
     val goToSignIn: () -> Unit = {
         navController.navigate("sign_in") {
-            popUpTo(navController.graph.startDestinationId) { inclusive = true }
+            popUpTo(0) { inclusive = true }
             launchSingleTop = true
+        }
+    }
+
+    var uiMessage by rememberSaveable { mutableStateOf<String?>(null) }
+    
+    LaunchedEffect(session) {
+        if (session == null) {
+            val currentRoute = navController.currentDestination?.route
+            if (currentRoute != null && currentRoute != "sign_in" && currentRoute != "sign_up") {
+                uiMessage = "Tu sesion ha expirado. Por favor inicia sesion nuevamente."
+                goToSignIn()
+            }
         }
     }
     
     val onUnauthorized: () -> Unit = {
         authRepository.clearSession()
-        goToSignIn()
     }
     
     val onLogout: () -> Unit = {
