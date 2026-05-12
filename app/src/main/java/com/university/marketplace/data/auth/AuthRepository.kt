@@ -5,10 +5,12 @@ import android.util.Log
 import com.university.marketplace.data.api.NetworkModule
 import com.university.marketplace.domain.AuthenticatedUser
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
 interface AuthRepository {
+    val sessionFlow: Flow<AuthSession?>
     suspend fun login(email: String, password: String, persistSession: Boolean): AuthenticatedUser
     suspend fun signup(name: String, email: String, password: String, persistSession: Boolean): AuthenticatedUser
     suspend fun getCurrentUser(): AuthenticatedUser
@@ -22,6 +24,8 @@ class DefaultAuthRepository(
     private val apiService: AuthApiService,
     private val sessionStorage: AuthSessionStorage
 ) : AuthRepository {
+    override val sessionFlow: Flow<AuthSession?> = sessionStorage.sessionFlow
+
     override suspend fun login(
         email: String,
         password: String,
@@ -185,7 +189,17 @@ class DefaultAuthRepository(
         unauthorizedMessage: String = "invalid credentials"
     ): AuthException {
         val apiMessage: String? = errorBody?.let { body ->
-            runCatching { JSONObject(body).optString("detail").takeIf { it.isNotBlank() } }.getOrNull()
+            runCatching {
+                val json = JSONObject(body)
+                listOf("detail", "message", "error")
+                    .firstNotNullOfOrNull { key -> json.optString(key).takeIf { it.isNotBlank() } }
+            }.getOrNull()
+        }
+
+        if (!errorBody.isNullOrBlank()) {
+            Log.w(TAG, "Auth failed with HTTP $statusCode: $errorBody")
+        } else {
+            Log.w(TAG, "Auth failed with HTTP $statusCode and empty body")
         }
 
         val message: String =
@@ -195,7 +209,8 @@ class DefaultAuthRepository(
                 when (statusCode) {
                     401 -> unauthorizedMessage
                     409 -> "This email is already registered."
-                    else -> "We could not complete the request. Please try again."
+                    else -> errorBody?.takeIf { it.isNotBlank() }
+                        ?: "We could not complete the request. Please try again."
                 }
             }
 
