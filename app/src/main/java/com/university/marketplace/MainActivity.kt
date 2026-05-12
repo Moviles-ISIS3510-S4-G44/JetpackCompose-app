@@ -224,10 +224,10 @@ fun AppNavigation(container: com.university.marketplace.di.AppContainer) {
                     navController.navigate("create_listing")
                 },
                 onNavigateToPurchases = {
-                    navController.navigate("purchase_history")
+                    navigateToTopLevel("purchase_history")
                 },
                 onNavigateToMessages = {
-                    navController.navigate("conversations")
+                    navigateToTopLevel("conversations")
                 },
                 isOnline = isOnline
             )
@@ -247,7 +247,9 @@ fun AppNavigation(container: com.university.marketplace.di.AppContainer) {
                 onUnauthorized = onUnauthorized,
                 myListingsViewModel = myListingsViewModel,
                 onNavigateToDetail = { id -> navController.navigate("product_detail/$id") },
-                onNavigateToSales = { navController.navigate("sales_history") }
+                onNavigateToSales = { navController.navigate("sales_history") },
+                onNavigateToPurchases = { navigateToTopLevel("purchase_history") },
+                onNavigateToMessages = { navigateToTopLevel("conversations") }
             )
         }
         composable(
