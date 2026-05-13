@@ -74,7 +74,9 @@ fun ProfileRoute(
     onUnauthorized: () -> Unit,
     myListingsViewModel: MyListingsViewModel? = null,
     onNavigateToDetail: ((String) -> Unit)? = null,
-    onNavigateToSales: (() -> Unit)? = null
+    onNavigateToSales: (() -> Unit)? = null,
+    onNavigateToPurchases: (() -> Unit)? = null,
+    onNavigateToMessages: (() -> Unit)? = null
 ) {
     var user by rememberSaveable(stateSaver = AuthenticatedUserSaver) {
         mutableStateOf<AuthenticatedUser?>(null)
@@ -129,7 +131,9 @@ fun ProfileRoute(
         onLogout = onLogout,
         myListingsUiState = myListingsUiState,
         onNavigateToDetail = onNavigateToDetail,
-        onNavigateToSales = onNavigateToSales
+        onNavigateToSales = onNavigateToSales,
+        onNavigateToPurchases = onNavigateToPurchases,
+        onNavigateToMessages = onNavigateToMessages
     )
 }
 
@@ -144,7 +148,9 @@ private fun ProfileScreen(
     onLogout: () -> Unit,
     myListingsUiState: MyListingsUiState = MyListingsUiState.Empty,
     onNavigateToDetail: ((String) -> Unit)? = null,
-    onNavigateToSales: (() -> Unit)? = null
+    onNavigateToSales: (() -> Unit)? = null,
+    onNavigateToPurchases: (() -> Unit)? = null,
+    onNavigateToMessages: (() -> Unit)? = null
 ) {
     var showLogoutDialog by rememberSaveable { mutableStateOf(false) }
     val offlineBannerController = rememberOfflineBannerController(isOnline)
@@ -180,6 +186,8 @@ private fun ProfileScreen(
                     when (route) {
                         "home" -> onNavigateHome()
                         "create_listing" -> onNavigateSell()
+                        "purchase_history" -> onNavigateToPurchases?.invoke()
+                        "conversations" -> onNavigateToMessages?.invoke()
                     }
                 }
             )
