@@ -114,7 +114,7 @@ fun CreateListingScreen(
                             else -> "new"
                         }
                         val images = if (imageUri != null) listOf(imageUri.toString()) else emptyList()
-                        
+
                         val locationString = if (pickedLocation != null) {
                             "${pickedLocation!!.latitude},${pickedLocation!!.longitude}"
                         } else ""

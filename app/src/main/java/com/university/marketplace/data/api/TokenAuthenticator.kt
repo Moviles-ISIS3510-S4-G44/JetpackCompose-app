@@ -12,12 +12,6 @@ import okhttp3.Request
 import okhttp3.Response
 import okhttp3.Route
 
-/**
- * Attempts to recover from a 401 response by refreshing the stored session
- * with the backend and retrying the original request with the new access
- * token. Auth endpoints (login/signup/refresh/logout) and requests that
- * already retried once are ignored to avoid loops.
- */
 internal class TokenAuthenticator(
     private val sessionStorage: AuthSessionStorage,
     private val refreshApi: AuthApiService

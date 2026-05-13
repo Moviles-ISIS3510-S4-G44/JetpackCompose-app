@@ -25,6 +25,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.listSaver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
@@ -92,6 +93,7 @@ fun ProductDetailScreen(
     }
 
     LaunchedEffect(Unit) {
+
         val hasFineLocation = ContextCompat.checkSelfPermission(
             context,
             Manifest.permission.ACCESS_FINE_LOCATION
@@ -212,7 +214,7 @@ fun ProductDetailScreen(
                                 color = MarketplaceWhite,
                                 border = androidx.compose.foundation.BorderStroke(1.dp, Color.LightGray)
                             ) {
-                                IconButton(onClick = { /* Guardar */ }) {
+                                IconButton(onClick = { /* Guardar */}) {
                                     Icon(Icons.Default.BookmarkBorder, contentDescription = null)
                                 }
                             }

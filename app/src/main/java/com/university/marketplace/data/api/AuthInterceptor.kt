@@ -3,11 +3,6 @@ package com.university.marketplace.data.api
 import okhttp3.Interceptor
 import okhttp3.Response
 
-/**
- * Attaches the current access token as a Bearer Authorization header to every
- * request, except for auth endpoints (login/signup/refresh/logout) and requests
- * that already carry an explicit Authorization header.
- */
 internal class AuthInterceptor(
     private val tokenProvider: () -> String?
 ) : Interceptor {
