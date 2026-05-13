@@ -2,6 +2,7 @@ package com.university.marketplace.ui.home
 
 data class ListingUiModel(
     val id: String,
+    val sellerId: String,
     val name: String,
     val price: Double,
     val imageUrl: String,

@@ -212,6 +212,10 @@ class ListingsRepository(
         return api.getMyListings().map { it.toDomain() }
     }
 
+    override suspend fun getListingsBySellerId(sellerId: String): List<Listing> {
+        return api.getListings(status = "published").filter { it.sellerId == sellerId }.map { it.toDomain() }
+    }
+
     override suspend fun createListing(
         sellerId: String,
         categoryId: String,

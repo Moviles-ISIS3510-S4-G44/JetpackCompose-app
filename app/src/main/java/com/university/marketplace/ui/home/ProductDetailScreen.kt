@@ -50,6 +50,7 @@ fun ProductDetailScreen(
     isOnline: Boolean,
     onBack: () -> Unit,
     onMessageSeller: (() -> Unit)? = null,
+    onNavigateToSellerProfile: (String, String) -> Unit,
     viewModel: ListingDetailViewModel
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -236,11 +237,13 @@ fun ProductDetailScreen(
                     val listing = state.listing
                     if (isWideScreen()) {
                         WideListingDetail(
-                            listing = listing
+                            listing = listing,
+                            onNavigateToSellerProfile = onNavigateToSellerProfile
                         )
                     } else {
                         CompactListingDetail(
-                            listing = listing
+                            listing = listing,
+                            onNavigateToSellerProfile = onNavigateToSellerProfile
                         )
                     }
                 }
@@ -251,7 +254,8 @@ fun ProductDetailScreen(
 
 @Composable
 private fun CompactListingDetail(
-    listing: ListingUiModel
+    listing: ListingUiModel,
+    onNavigateToSellerProfile: (String, String) -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -267,13 +271,14 @@ private fun CompactListingDetail(
                 .height(350.dp),
             contentScale = ContentScale.Crop
         )
-        ListingDetailBody(listing = listing)
+        ListingDetailBody(listing = listing, onNavigateToSellerProfile = onNavigateToSellerProfile)
     }
 }
 
 @Composable
 private fun WideListingDetail(
-    listing: ListingUiModel
+    listing: ListingUiModel,
+    onNavigateToSellerProfile: (String, String) -> Unit
 ) {
     Row(
         modifier = Modifier
@@ -294,15 +299,22 @@ private fun WideListingDetail(
                 .fillMaxHeight()
                 .verticalScroll(rememberScrollState())
         ) {
-            ListingDetailBody(listing = listing)
+            ListingDetailBody(listing = listing, onNavigateToSellerProfile = onNavigateToSellerProfile)
         }
     }
 }
 
 @Composable
 private fun ListingDetailBody(
-    listing: ListingUiModel
+    listing: ListingUiModel,
+    onNavigateToSellerProfile: (String, String) -> Unit
 ) {
+    val displaySellerName = if (listing.sellerName.length > 20) {
+        "Seller " + (listing.sellerName.split("-").firstOrNull()?.uppercase() ?: listing.sellerName.take(8))
+    } else {
+        listing.sellerName
+    }
+
     Column(modifier = Modifier.padding(20.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
@@ -348,10 +360,12 @@ private fun ListingDetailBody(
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(modifier = Modifier.size(48.dp).clip(CircleShape).background(Color.LightGray))
             Column(modifier = Modifier.padding(start = 12.dp).weight(1f)) {
-                Text(listing.sellerName, fontWeight = FontWeight.Bold)
+                Text(displaySellerName, fontWeight = FontWeight.Bold)
                 Text("University Student", fontSize = 12.sp, color = Color.Gray)
             }
-            Text("View Profile", color = MarketplaceYellow, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            TextButton(onClick = { onNavigateToSellerProfile(listing.sellerId, listing.sellerName) }) {
+                Text("View Profile", color = MarketplaceYellow, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            }
         }
 
         Spacer(modifier = Modifier.height(24.dp))
