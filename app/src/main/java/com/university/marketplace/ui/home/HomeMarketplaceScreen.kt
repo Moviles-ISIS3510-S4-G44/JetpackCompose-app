@@ -307,39 +307,6 @@ private fun SearchHeader(
             contentPadding = PaddingValues(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            item {
-                FilterChip(
-                    selected = selectedLocationSort == LocationSortOption.NONE,
-                    onClick = { onLocationSortSelected(LocationSortOption.NONE) },
-                    label = { Text("Relevancia") },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = MarketplaceWhite,
-                        containerColor = Color.White.copy(alpha = 0.65f)
-                    )
-                )
-            }
-            item {
-                FilterChip(
-                    selected = selectedLocationSort == LocationSortOption.NEAREST,
-                    onClick = { onLocationSortSelected(LocationSortOption.NEAREST) },
-                    label = { Text("Más cercanos") },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = MarketplaceWhite,
-                        containerColor = Color.White.copy(alpha = 0.65f)
-                    )
-                )
-            }
-            item {
-                FilterChip(
-                    selected = selectedLocationSort == LocationSortOption.FARTHEST,
-                    onClick = { onLocationSortSelected(LocationSortOption.FARTHEST) },
-                    label = { Text("Más lejanos") },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = MarketplaceWhite,
-                        containerColor = Color.White.copy(alpha = 0.65f)
-                    )
-                )
-            }
         }
 
         Spacer(modifier = Modifier.height(8.dp))
