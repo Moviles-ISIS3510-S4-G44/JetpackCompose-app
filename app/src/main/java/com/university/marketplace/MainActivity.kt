@@ -53,6 +53,8 @@ import com.university.marketplace.ui.home.HomeMarketplaceScreen
 import com.university.marketplace.ui.home.HomeViewModel
 import com.university.marketplace.ui.home.ListingDetailViewModel
 import com.university.marketplace.ui.home.ProductDetailScreen
+import com.university.marketplace.ui.favorites.FavoritesScreen
+import com.university.marketplace.ui.favorites.FavoritesViewModel
 import com.university.marketplace.ui.profile.MyListingsViewModel
 import com.university.marketplace.ui.profile.ProfileRoute
 import com.university.marketplace.ui.chat.ChatScreen
@@ -175,7 +177,7 @@ fun AppNavigation(container: com.university.marketplace.di.AppContainer) {
         NavHost(navController = navController, startDestination = startDestination) {
         composable("sign_in") {
             val authViewModel = viewModel<AuthViewModel>(
-                factory = AuthViewModelFactory(authRepository, container.locationRepository)
+                factory = AuthViewModelFactory(authRepository, container.locationRepository, container.favoriteRepository)
             )
             SignInScreen(
                 isOnline = isOnline,
@@ -193,7 +195,7 @@ fun AppNavigation(container: com.university.marketplace.di.AppContainer) {
         }
         composable("sign_up") {
             val authViewModel = viewModel<AuthViewModel>(
-                factory = AuthViewModelFactory(authRepository, container.locationRepository)
+                factory = AuthViewModelFactory(authRepository, container.locationRepository, container.favoriteRepository)
             )
             SignUpScreen(
                 isOnline = isOnline,
@@ -239,6 +241,9 @@ fun AppNavigation(container: com.university.marketplace.di.AppContainer) {
                 },
                 onNavigateToMessages = {
                     navigateToTopLevel("conversations")
+                },
+                onNavigateToFavorites = {
+                    navController.navigate("favorites")
                 },
                 isOnline = isOnline
             )
@@ -319,6 +324,14 @@ fun AppNavigation(container: com.university.marketplace.di.AppContainer) {
                     viewModel = detailViewModel
                 )
             }
+        }
+        composable("favorites") {
+            val favoritesViewModel: FavoritesViewModel = viewModel(factory = factory)
+            FavoritesScreen(
+                onBack = { navController.popBackStack() },
+                onProductClick = { id -> navController.navigate("product_detail/$id") },
+                viewModel = favoritesViewModel
+            )
         }
         composable("purchase_history") {
             val purchaseHistoryViewModel: PurchaseHistoryViewModel = viewModel(factory = factory)

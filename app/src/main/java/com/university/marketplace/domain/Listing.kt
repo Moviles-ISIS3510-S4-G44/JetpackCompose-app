@@ -11,6 +11,7 @@ data class Listing(
     val images: List<String>,
     val status: String,
     val latitude: Double?,
-    val longitude: Double?
+    val longitude: Double?,
+    val locationName: String? = null
 )
 

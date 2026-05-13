@@ -1,15 +1,25 @@
 package com.university.marketplace.data.mappers
 
-import android.util.Log
 import com.university.marketplace.data.api.ListingDto
 import com.university.marketplace.domain.Listing
 
-private const val TAG = "ListingDtoMapper"
-
 fun ListingDto.toDomain(): Listing {
     val coordinates = ListingLocationParser.parse(location)
-    if (coordinates == null && location != null && Log.isLoggable(TAG, Log.DEBUG)) {
-        Log.d(TAG, "Skipping invalid location for listing id=$id. rawLocation=$location")
+    
+    val nameFromLocation = when (val loc = location) {
+        is String -> {
+            if (loc.contains("|")) {
+                loc.substringAfter("|").trim()
+            } else if (coordinates == null) {
+                loc
+            } else {
+                null
+            }
+        }
+        is Map<*, *> -> {
+            (loc["name"] ?: loc["label"] ?: loc["location"] ?: loc["address"])?.toString()
+        }
+        else -> null
     }
 
     return Listing(
@@ -23,7 +33,8 @@ fun ListingDto.toDomain(): Listing {
         images = images,
         status = status,
         latitude = coordinates?.latitude,
-        longitude = coordinates?.longitude
+        longitude = coordinates?.longitude,
+        locationName = this.locationName ?: nameFromLocation
     )
 }
 

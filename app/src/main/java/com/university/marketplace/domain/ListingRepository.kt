@@ -25,6 +25,9 @@ interface ListingRepository {
         price: Int,
         condition: String,
         images: List<String>,
-        location: String
+        location: String,
+        locationName: String? = null
     ): Listing
+
+    suspend fun saveListing(listing: Listing)
 }

@@ -20,7 +20,13 @@ object ListingLocationParser {
     }
 
     private fun parseFromString(raw: String): ListingCoordinates? {
-        val parts = raw.split(",")
+        val cleanRaw = if (raw.contains("|")) raw.substringBefore("|").trim() else raw
+        val parts = if (cleanRaw.contains(",")) {
+            cleanRaw.split(",")
+        } else {
+            cleanRaw.trim().split(Regex("\\s+"))
+        }
+
         if (parts.size != 2) return null
 
         val latitude = parts[0].trim().toDoubleOrNull() ?: return null
@@ -29,9 +35,25 @@ object ListingLocationParser {
     }
 
     private fun parseFromMap(raw: Map<*, *>): ListingCoordinates? {
-        val latitude = raw["latitude"].toDoubleOrNull() ?: raw["lat"].toDoubleOrNull() ?: return null
-        val longitude = raw["longitude"].toDoubleOrNull() ?: raw["lng"].toDoubleOrNull() ?: return null
-        return create(latitude, longitude)
+        // Standard keys
+        val lat = raw["latitude"].toDoubleOrNull() ?: raw["lat"].toDoubleOrNull()
+        val lng = raw["longitude"].toDoubleOrNull() ?: raw["lng"].toDoubleOrNull()
+        
+        if (lat != null && lng != null) {
+            return create(lat, lng)
+        }
+
+        // GeoJSON style
+        val coords = raw["coordinates"] as? List<*>
+        if (coords != null && coords.size >= 2) {
+            val lonGeo = coords[0].toDoubleOrNull()
+            val latGeo = coords[1].toDoubleOrNull()
+            if (latGeo != null && lonGeo != null) {
+                return create(latGeo, lonGeo)
+            }
+        }
+
+        return null
     }
 
     private fun create(latitude: Double, longitude: Double): ListingCoordinates? {

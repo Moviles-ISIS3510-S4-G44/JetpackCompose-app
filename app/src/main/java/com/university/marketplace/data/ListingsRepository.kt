@@ -31,8 +31,6 @@ import kotlinx.coroutines.withContext
 import com.university.marketplace.BuildConfig
 import android.util.LruCache
 import kotlin.math.min
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
 
 class ListingsRepository(
     private val api: ListingsApi = NetworkModule.listingsApi,
@@ -89,7 +87,12 @@ class ListingsRepository(
     }
 
     override suspend fun getListingById(id: String): Listing {
-        return dao.getListingById(id)?.toDomain() ?: api.getListingById(id).toDomain()
+        val local = dao.getListingById(id)
+        if (local != null) return local.toDomain()
+        
+        val remote = api.getListingById(id).toDomain()
+        saveListing(remote) // Cache it locally
+        return remote
     }
 
     override suspend fun searchListings(query: String): Flow<List<Listing>> {
@@ -116,11 +119,9 @@ class ListingsRepository(
 
         val cachedEntities = dao.getActiveListingsList()
         cachedEntities.forEach { entity ->
-            entity.embedding?.let { embeddingBytes ->
+            entity.embedding?.let { embedding ->
                 if (embeddingCache.get(entity.id) == null) {
-                    byteArrayToFloatArray(embeddingBytes)?.let { floatArray ->
-                        embeddingCache.put(entity.id, floatArray)
-                    }
+                    embeddingCache.put(entity.id, embedding)
                 }
             }
         }
@@ -153,13 +154,9 @@ class ListingsRepository(
 
             val rankedListings = cachedEntities.map { entity ->
                 val listing = entity.toDomain()
-                val semanticScore = if (entity.embedding != null) {
-                    byteArrayToFloatArray(entity.embedding)?.let {
-                        semanticSearchEngine.calculateCosineSimilarity(queryEmbedding, it)
-                    } ?: 0f
-                } else {
-                    0f
-                }
+                val semanticScore = entity.embedding?.let {
+                    semanticSearchEngine.calculateCosineSimilarity(queryEmbedding, it)
+                } ?: 0f
                 val lexicalScore = textSimilarityScore(listing, expandedQueryTokens)
                 val phraseBoost = if (
                     SearchTextNormalizer.normalize("${listing.title} ${listing.description}").contains(normalizedQuery)
@@ -223,9 +220,10 @@ class ListingsRepository(
         price: Int,
         condition: String,
         images: List<String>,
-        location: String
+        location: String,
+        locationName: String?
     ): Listing {
-        return api.createListing(
+        val listing = api.createListing(
             CreateListingDto(
                 sellerId = sellerId,
                 categoryId = categoryId,
@@ -234,9 +232,19 @@ class ListingsRepository(
                 price = price,
                 condition = condition,
                 images = images,
-                location = location
+                location = location,
+                locationName = locationName
             )
         ).toDomain()
+        saveListing(listing)
+        return listing
+    }
+
+    override suspend fun saveListing(listing: Listing) {
+        withContext(Dispatchers.IO) {
+            val embedding = semanticSearchEngine.getEmbedding("${listing.title} ${listing.description}")
+            dao.insertListings(listOf(listing.toEntity(embedding)))
+        }
     }
 
     private suspend fun parseSearchIntent(query: String): SearchIntent? {
@@ -365,15 +373,5 @@ class ListingsRepository(
             }
         }
         return costs[b.length]
-    }
-
-    private fun byteArrayToFloatArray(bytes: ByteArray?): FloatArray? {
-        if (bytes == null) return null
-        val buffer = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN)
-        val floats = FloatArray(bytes.size / 4)
-        for (i in floats.indices) {
-            floats[i] = buffer.getFloat(i * 4)
-        }
-        return floats
     }
 }

@@ -10,5 +10,6 @@ data class CreateListingDto(
     val price: Int,
     val condition: String,
     val images: List<String>,
-    val location: String
+    val location: String,
+    @Json(name = "location_name") val locationName: String? = null
 )

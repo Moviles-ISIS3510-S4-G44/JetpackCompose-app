@@ -3,19 +3,30 @@ package com.university.marketplace.ui.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.university.marketplace.data.InteractionsRepository
+import com.university.marketplace.data.location.LocationRepository
 import com.university.marketplace.data.toUserFriendlyMessage
+import com.university.marketplace.domain.FavoriteRepository
 import com.university.marketplace.domain.usecase.CreatePurchaseUseCase
 import com.university.marketplace.domain.usecase.GetListingByIdUseCase
 import com.university.marketplace.ui.common.toUserFriendlyMessage
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-sealed interface ListingDetailUiState {
-    object Loading : ListingDetailUiState
-    data class Success(val listing: ListingUiModel) : ListingDetailUiState
-    data class Error(val message: String) : ListingDetailUiState
+data class ListingDetailUiState(
+    val content: Content = Content.Loading,
+    val isFavorited: Boolean = false,
+    val userLocation: Pair<Double, Double>? = null
+) {
+    sealed interface Content {
+        object Loading : Content
+        data class Success(val listing: ListingUiModel) : Content
+        data class Error(val message: String) : Content
+    }
 }
 
 sealed interface PurchaseUiState {
@@ -28,42 +39,88 @@ sealed interface PurchaseUiState {
 class ListingDetailViewModel(
     private val getListingByIdUseCase: GetListingByIdUseCase,
     private val interactionsRepository: InteractionsRepository,
+    private val favoriteRepository: FavoriteRepository,
+    private val locationRepository: LocationRepository,
     private val createPurchaseUseCase: CreatePurchaseUseCase? = null
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow<ListingDetailUiState>(ListingDetailUiState.Loading)
+    private val _uiState = MutableStateFlow(ListingDetailUiState())
     val uiState: StateFlow<ListingDetailUiState> = _uiState.asStateFlow()
 
     private val _purchaseState = MutableStateFlow<PurchaseUiState>(PurchaseUiState.Idle)
     val purchaseState: StateFlow<PurchaseUiState> = _purchaseState.asStateFlow()
 
     fun loadListing(id: String) {
+        refreshUserLocation()
+        favoriteRepository.isFavorite(id)
+            .onEach { isFav ->
+                _uiState.update { it.copy(isFavorited = isFav) }
+            }
+            .launchIn(viewModelScope)
+
         viewModelScope.launch {
-            _uiState.value = ListingDetailUiState.Loading
+            _uiState.update { it.copy(content = ListingDetailUiState.Content.Loading) }
             try {
                 val listing = getListingByIdUseCase(id)
-                _uiState.value = ListingDetailUiState.Success(listing.toUiModel())
+                val userLoc = _uiState.value.userLocation?.let { (lat, lon) ->
+                    android.location.Location("user").apply {
+                        latitude = lat
+                        longitude = lon
+                    }
+                }
+                _uiState.update { it.copy(content = ListingDetailUiState.Content.Success(listing.toUiModel(userLoc))) }
                 viewModelScope.launch {
                     interactionsRepository.registerVisit(listing.id)
                 }
             } catch (e: Exception) {
-                _uiState.value = ListingDetailUiState.Error(
-                    e.toUserFriendlyMessage(fallback = "Failed to load listing")
-                )
+                _uiState.update { 
+                    it.copy(content = ListingDetailUiState.Content.Error(
+                        e.toUserFriendlyMessage(fallback = "Failed to load listing")
+                    ))
+                }
+            }
+        }
+    }
+
+    fun refreshUserLocation() {
+        viewModelScope.launch {
+            locationRepository.getLastKnownLocation()?.let { loc ->
+                val newLoc = loc.latitude to loc.longitude
+                _uiState.update { state ->
+                    val updatedContent = if (state.content is ListingDetailUiState.Content.Success) {
+                        val androidLoc = android.location.Location("user").apply {
+                            latitude = loc.latitude
+                            longitude = loc.longitude
+                        }
+                        val currentListing = state.content.listing
+                        val distanceStr = calculateDistanceString(
+                            currentListing.locationName,
+                            currentListing.latitude,
+                            currentListing.longitude,
+                            androidLoc
+                        )
+                        ListingDetailUiState.Content.Success(currentListing.copy(distance = distanceStr))
+                    } else {
+                        state.content
+                    }
+                    state.copy(userLocation = newLoc, content = updatedContent)
+                }
             }
         }
     }
 
     fun showOfflineState() {
-        if (_uiState.value is ListingDetailUiState.Success) return
-        _uiState.value = ListingDetailUiState.Error(
-            "You appear to be offline. Please check your connection and try again."
-        )
+        if (_uiState.value.content is ListingDetailUiState.Content.Success) return
+        _uiState.update { 
+            it.copy(content = ListingDetailUiState.Content.Error(
+                "You appear to be offline. Please check your connection and try again."
+            ))
+        }
     }
 
     fun resetToLoading() {
-        if (_uiState.value is ListingDetailUiState.Success) return
-        _uiState.value = ListingDetailUiState.Loading
+        if (_uiState.value.content is ListingDetailUiState.Content.Success) return
+        _uiState.update { it.copy(content = ListingDetailUiState.Content.Loading) }
     }
 
     fun purchase(listingId: String) {
@@ -78,6 +135,12 @@ class ListingDetailViewModel(
                     e.toUserFriendlyMessage(fallback = "Purchase failed")
                 )
             }
+        }
+    }
+
+    fun toggleFavorite(listingId: String) {
+        viewModelScope.launch {
+            favoriteRepository.toggleFavorite(listingId)
         }
     }
 

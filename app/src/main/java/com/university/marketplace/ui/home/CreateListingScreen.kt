@@ -15,6 +15,7 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -24,8 +25,16 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlinx.coroutines.launch
+import androidx.compose.ui.platform.LocalContext
 import coil.compose.AsyncImage
+import com.google.android.gms.maps.model.CameraPosition
+import com.google.android.gms.maps.model.LatLng
+import com.google.maps.android.compose.GoogleMap
+import com.google.maps.android.compose.MapUiSettings
+import com.google.maps.android.compose.Marker
+import com.google.android.gms.maps.model.BitmapDescriptorFactory
+import com.google.maps.android.compose.rememberCameraPositionState
+import com.google.maps.android.compose.rememberMarkerState
 import com.university.marketplace.ui.common.isWideScreen
 import com.university.marketplace.ui.theme.*
 
@@ -33,6 +42,13 @@ private val UriSaver: Saver<Uri?, String> = Saver(
     save = { uri -> uri?.toString() ?: "" },
     restore = { value -> if (value.isEmpty()) null else Uri.parse(value) }
 )
+
+private val LatLngSaver = listSaver<LatLng?, Double>(
+    save = { value -> value?.let { listOf(it.latitude, it.longitude) } ?: emptyList() },
+    restore = { list -> if (list.size == 2) LatLng(list[0], list[1]) else null }
+)
+
+private val DEFAULT_MAP_CENTER = LatLng(4.601, -74.065)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -45,11 +61,13 @@ fun CreateListingScreen(
     var price by rememberSaveable { mutableStateOf("") }
     var description by rememberSaveable { mutableStateOf("") }
     var selectedCondition by rememberSaveable { mutableStateOf("Nuevo") }
-    var location by rememberSaveable { mutableStateOf("") }
+    var pickedLocation by rememberSaveable(stateSaver = LatLngSaver) {
+        mutableStateOf<LatLng?>(null)
+    }
     var imageUri by rememberSaveable(stateSaver = UriSaver) { mutableStateOf<Uri?>(null) }
     var categoryMenuExpanded by remember { mutableStateOf(false) }
     var selectedCategoryId by rememberSaveable { mutableStateOf("") }
-    var selectedCategoryName by rememberSaveable { mutableStateOf("Select category") }
+    var selectedCategoryName by rememberSaveable { mutableStateOf("Selecciona una categoría") }
 
     val galleryLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
@@ -63,7 +81,6 @@ fun CreateListingScreen(
     }
 
     val snackbarHostState = remember { SnackbarHostState() }
-    val coroutineScope = rememberCoroutineScope()
     LaunchedEffect(uiState) {
         if (uiState is CreateListingUiState.Error) {
             snackbarHostState.showSnackbar((uiState as CreateListingUiState.Error).message)
@@ -91,47 +108,17 @@ fun CreateListingScreen(
                 Button(
                     onClick = {
                         val priceInt = price.toIntOrNull() ?: 0
-                        val conditionApi = when (selectedCondition.lowercase()) {
-                            "como nuevo" -> "refurbished"
-                            "usado" -> "used"
+                        val conditionApi = when (selectedCondition) {
+                            "Como nuevo" -> "like_new"
+                            "Usado" -> "used"
                             else -> "new"
                         }
-                        val rawImage = imageUri?.toString().orEmpty()
-                        val images = if (rawImage.startsWith("http://") || rawImage.startsWith("https://")) {
-                            listOf(rawImage)
-                        } else {
-                            emptyList()
-                        }
+                        val images = if (imageUri != null) listOf(imageUri.toString()) else emptyList()
 
-                        if (selectedCategoryId.isBlank()) {
-                            coroutineScope.launch {
-                                snackbarHostState.showSnackbar("Selecciona una categoría")
-                            }
-                            return@Button
-                        }
-                        if (title.isBlank()) {
-                            coroutineScope.launch {
-                                snackbarHostState.showSnackbar("Ingresa un título")
-                            }
-                            return@Button
-                        }
-                        if (priceInt <= 0) {
-                            coroutineScope.launch {
-                                snackbarHostState.showSnackbar("Ingresa un precio válido")
-                            }
-                            return@Button
-                        }
-                        if (location.isBlank()) {
-                            coroutineScope.launch {
-                                snackbarHostState.showSnackbar("Ingresa una ubicación")
-                            }
-                            return@Button
-                        }
-                        if (imageUri != null && images.isEmpty()) {
-                            coroutineScope.launch {
-                                snackbarHostState.showSnackbar("La imagen local no se sube aún. Se enviará sin imagen.")
-                            }
-                        }
+                        val locationString = if (pickedLocation != null) {
+                            "${pickedLocation!!.latitude},${pickedLocation!!.longitude}"
+                        } else ""
+
                         if (viewModel != null) {
                             viewModel.submit(
                                 categoryId = selectedCategoryId,
@@ -140,13 +127,13 @@ fun CreateListingScreen(
                                 price = priceInt,
                                 condition = conditionApi,
                                 images = images,
-                                location = location
+                                location = locationString
                             )
                         }
                     },
                     modifier = Modifier.fillMaxWidth().height(56.dp),
                     shape = RoundedCornerShape(28.dp),
-                    enabled = isOnline && !isLoading,
+                    enabled = isOnline && !isLoading && pickedLocation != null,
                     colors = ButtonDefaults.buttonColors(containerColor = MarketplaceYellow)
                 ) {
                     if (isLoading) {
@@ -158,7 +145,7 @@ fun CreateListingScreen(
                     } else {
                         Icon(Icons.Default.Send, contentDescription = null, tint = MarketplaceDark)
                         Spacer(Modifier.width(8.dp))
-                        Text("Post Listing", color = MarketplaceDark, fontWeight = FontWeight.Bold)
+                        Text("Publicar", color = MarketplaceDark, fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -191,7 +178,7 @@ fun CreateListingScreen(
                             )
                             Spacer(modifier = Modifier.height(24.dp))
                             Text(
-                                "Condition",
+                                "Condición",
                                 fontWeight = FontWeight.Bold,
                                 modifier = Modifier.padding(bottom = 8.dp)
                             )
@@ -204,13 +191,13 @@ fun CreateListingScreen(
                             MarketplaceTextField(
                                 value = title,
                                 onValueChange = { title = it },
-                                label = "Title (e.g. Organic Chemistry)"
+                                label = "Título (ej. Cálculo Stewart)"
                             )
                             Spacer(modifier = Modifier.height(12.dp))
                             MarketplaceTextField(
                                 value = price,
                                 onValueChange = { price = it },
-                                label = "$ Price"
+                                label = "$ Precio"
                             )
                             Spacer(modifier = Modifier.height(12.dp))
                             CategoryDropdown(
@@ -225,16 +212,40 @@ fun CreateListingScreen(
                                 }
                             )
                             Spacer(modifier = Modifier.height(12.dp))
-                            MarketplaceTextField(
-                                value = location,
-                                onValueChange = { location = it },
-                                label = "Location (e.g. Bogotá)"
+                            Text(
+                                "Ubicación en el mapa (Toca para seleccionar)",
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(bottom = 8.dp)
                             )
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(200.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .border(1.dp, Color.Gray.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
+                            ) {
+                                val cameraPositionState = rememberCameraPositionState {
+                                    position = CameraPosition.fromLatLngZoom(pickedLocation ?: DEFAULT_MAP_CENTER, 15f)
+                                }
+                                GoogleMap(
+                                    modifier = Modifier.fillMaxSize(),
+                                    cameraPositionState = cameraPositionState,
+                                    onMapClick = { pickedLocation = it },
+                                    uiSettings = MapUiSettings(zoomControlsEnabled = true)
+                                ) {
+                                    pickedLocation?.let {
+                                        Marker(
+                                            state = rememberMarkerState(position = it),
+                                            title = "Ubicación seleccionada"
+                                        )
+                                    }
+                                }
+                            }
                             Spacer(modifier = Modifier.height(12.dp))
                             MarketplaceTextField(
                                 value = description,
                                 onValueChange = { description = it },
-                                label = "Item Description",
+                                label = "Descripción del producto",
                                 singleLine = false,
                                 modifier = Modifier.height(160.dp)
                             )
@@ -251,13 +262,13 @@ fun CreateListingScreen(
                     MarketplaceTextField(
                         value = title,
                         onValueChange = { title = it },
-                        label = "Title (e.g. Organic Chemistry)"
+                        label = "Título (ej. Cálculo Stewart)"
                     )
                     Spacer(modifier = Modifier.height(12.dp))
                     MarketplaceTextField(
                         value = price,
                         onValueChange = { price = it },
-                        label = "$ Price"
+                        label = "$ Precio"
                     )
                     Spacer(modifier = Modifier.height(12.dp))
                     CategoryDropdown(
@@ -272,16 +283,40 @@ fun CreateListingScreen(
                         }
                     )
                     Spacer(modifier = Modifier.height(12.dp))
-                    MarketplaceTextField(
-                        value = location,
-                        onValueChange = { location = it },
-                        label = "Location (e.g. Bogotá)"
+                    Text(
+                        "Ubicación en el mapa (Toca para seleccionar)",
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(bottom = 8.dp)
                     )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(200.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .border(1.dp, Color.Gray.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
+                    ) {
+                        val cameraPositionState = rememberCameraPositionState {
+                            position = CameraPosition.fromLatLngZoom(pickedLocation ?: DEFAULT_MAP_CENTER, 15f)
+                        }
+                        GoogleMap(
+                            modifier = Modifier.fillMaxSize(),
+                            cameraPositionState = cameraPositionState,
+                            onMapClick = { pickedLocation = it },
+                            uiSettings = MapUiSettings(zoomControlsEnabled = true)
+                        ) {
+                            pickedLocation?.let {
+                                Marker(
+                                    state = rememberMarkerState(position = it),
+                                    title = "Ubicación seleccionada"
+                                )
+                            }
+                        }
+                    }
 
                     Spacer(modifier = Modifier.height(24.dp))
 
                     Text(
-                        "Condition",
+                        "Condición",
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.padding(bottom = 8.dp)
                     )
@@ -295,7 +330,7 @@ fun CreateListingScreen(
                     MarketplaceTextField(
                         value = description,
                         onValueChange = { description = it },
-                        label = "Item Description",
+                        label = "Descripción del producto",
                         singleLine = false,
                         modifier = Modifier.height(120.dp)
                     )
@@ -304,7 +339,7 @@ fun CreateListingScreen(
                 if (!isOnline) {
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(
-                        text = "You are offline. Publishing is disabled until the connection is restored.",
+                        text = "Estás en modo offline. La publicación está deshabilitada.",
                         color = Color.Red,
                         style = MaterialTheme.typography.bodySmall
                     )
@@ -362,7 +397,7 @@ private fun PhotoPickerSection(
     imageUri: Uri?,
     onPickImage: () -> Unit
 ) {
-    Text("Photos", fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 8.dp))
+    Text("Fotos", fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 8.dp))
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Box(
             modifier = Modifier
@@ -383,7 +418,7 @@ private fun PhotoPickerSection(
             } else {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Icon(Icons.Default.AddAPhoto, contentDescription = null, tint = Color.Gray)
-                    Text("ADD PHOTO", fontSize = 10.sp, color = Color.Gray)
+                    Text("AÑADIR FOTO", fontSize = 10.sp, color = Color.Gray)
                 }
             }
         }

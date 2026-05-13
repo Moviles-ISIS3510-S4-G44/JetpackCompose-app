@@ -9,10 +9,12 @@ import com.university.marketplace.data.auth.AuthRepository
 import com.university.marketplace.data.location.LocationRepository
 import com.university.marketplace.data.isNetworkConnectivityError
 import com.university.marketplace.domain.AuthenticatedUser
+import com.university.marketplace.domain.FavoriteRepository
 import com.university.marketplace.ui.common.toUserFriendlyMessage
 import com.university.marketplace.BuildConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -29,7 +31,8 @@ data class AuthUiState(
 
 class AuthViewModel(
     private val repository: AuthRepository,
-    private val locationRepository: LocationRepository
+    private val locationRepository: LocationRepository,
+    private val favoriteRepository: FavoriteRepository
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(AuthUiState())
     val uiState: StateFlow<AuthUiState> = _uiState.asStateFlow()
@@ -52,6 +55,10 @@ class AuthViewModel(
                 }
 
                 Log.d("AuthStrategy", "Login: ${user.email} | Ubicación: $location")
+
+                withContext(Dispatchers.IO) {
+                    favoriteRepository.mergeFavoritesFromServer()
+                }
 
                 _uiState.update { it.copy(isLoading = false, authenticatedUser = user) }
             } catch (throwable: Throwable) {
@@ -85,6 +92,10 @@ class AuthViewModel(
                 }
 
                 Log.d("AuthStrategy", "Registro: ${user.email} | Ubicación: $location")
+
+                withContext(Dispatchers.IO) {
+                    favoriteRepository.mergeFavoritesFromServer()
+                }
 
                 _uiState.update { it.copy(isLoading = false, authenticatedUser = user) }
             } catch (throwable: Throwable) {
@@ -151,12 +162,13 @@ class AuthViewModel(
 
 class AuthViewModelFactory(
     private val repository: AuthRepository,
-    private val locationRepository: LocationRepository
+    private val locationRepository: LocationRepository,
+    private val favoriteRepository: FavoriteRepository
 ) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(AuthViewModel::class.java)) {
-            return AuthViewModel(repository, locationRepository) as T
+            return AuthViewModel(repository, locationRepository, favoriteRepository) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
     }
