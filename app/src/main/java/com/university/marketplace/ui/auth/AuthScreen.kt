@@ -158,10 +158,15 @@ private fun AuthRoute(
     var passwordVisible by rememberSaveable { mutableStateOf(false) }
     var validationMessage by rememberSaveable { mutableStateOf<String?>(null) }
 
-    LaunchedEffect(uiState.errorMessage) {
+    LaunchedEffect(uiState.errorMessage, uiState.isInvalidCredentials) {
         val message = uiState.errorMessage ?: return@LaunchedEffect
         snackbarHostState.showSnackbar(message)
-        viewModel.clearError()
+        if (uiState.isInvalidCredentials) {
+            password = ""
+        }
+        if (!uiState.isInvalidCredentials) {
+            viewModel.clearError()
+        }
     }
 
     LaunchedEffect(uiState.authenticatedUser?.id) {
@@ -213,16 +218,29 @@ private fun AuthRoute(
                     offlineBannerController = offlineBannerController,
                     showNameField = showNameField,
                     name = name,
-                    onNameChange = { name = it; validationMessage = null },
+                    onNameChange = { 
+                        name = it
+                        validationMessage = null
+                        if (uiState.isInvalidCredentials) viewModel.clearError()
+                    },
                     email = email,
-                    onEmailChange = { email = it; validationMessage = null },
+                    onEmailChange = { 
+                        email = it
+                        validationMessage = null
+                        if (uiState.isInvalidCredentials) viewModel.clearError()
+                    },
                     password = password,
-                    onPasswordChange = { password = it; validationMessage = null },
+                    onPasswordChange = { 
+                        password = it
+                        validationMessage = null
+                        if (uiState.isInvalidCredentials) viewModel.clearError()
+                    },
                     passwordVisible = passwordVisible,
                     onPasswordVisibilityChanged = { passwordVisible = !passwordVisible },
                     persistSession = persistSession,
                     onPersistSessionChange = { persistSession = it },
                     validationMessage = validationMessage,
+                    isInvalidCredentials = uiState.isInvalidCredentials,
                     isLoading = uiState.isLoading,
                     primaryActionLabel = primaryActionLabel,
                     secondaryPrompt = secondaryPrompt,
@@ -269,16 +287,29 @@ private fun AuthRoute(
                         offlineBannerController = offlineBannerController,
                         showNameField = showNameField,
                         name = name,
-                        onNameChange = { name = it; validationMessage = null },
+                        onNameChange = { 
+                            name = it
+                            validationMessage = null
+                            if (uiState.isInvalidCredentials) viewModel.clearError()
+                        },
                         email = email,
-                        onEmailChange = { email = it; validationMessage = null },
+                        onEmailChange = { 
+                            email = it
+                            validationMessage = null
+                            if (uiState.isInvalidCredentials) viewModel.clearError()
+                        },
                         password = password,
-                        onPasswordChange = { password = it; validationMessage = null },
+                        onPasswordChange = { 
+                            password = it
+                            validationMessage = null
+                            if (uiState.isInvalidCredentials) viewModel.clearError()
+                        },
                         passwordVisible = passwordVisible,
                         onPasswordVisibilityChanged = { passwordVisible = !passwordVisible },
                         persistSession = persistSession,
                         onPersistSessionChange = { persistSession = it },
                         validationMessage = validationMessage,
+                        isInvalidCredentials = uiState.isInvalidCredentials,
                         isLoading = uiState.isLoading,
                         primaryActionLabel = primaryActionLabel,
                         secondaryPrompt = secondaryPrompt,
@@ -352,6 +383,7 @@ private fun AuthFormPane(
     persistSession: Boolean,
     onPersistSessionChange: (Boolean) -> Unit,
     validationMessage: String?,
+    isInvalidCredentials: Boolean,
     isLoading: Boolean,
     primaryActionLabel: String,
     secondaryPrompt: String,
@@ -387,6 +419,7 @@ private fun AuthFormPane(
                 persistSession = persistSession,
                 onPersistSessionChange = onPersistSessionChange,
                 validationMessage = validationMessage,
+                isInvalidCredentials = isInvalidCredentials,
                 isLoading = isLoading,
                 primaryActionLabel = primaryActionLabel,
                 secondaryPrompt = secondaryPrompt,
@@ -414,6 +447,7 @@ private fun AuthFormBody(
     persistSession: Boolean,
     onPersistSessionChange: (Boolean) -> Unit,
     validationMessage: String?,
+    isInvalidCredentials: Boolean,
     isLoading: Boolean,
     primaryActionLabel: String,
     secondaryPrompt: String,
@@ -446,7 +480,8 @@ private fun AuthFormBody(
             value = email,
             onValueChange = onEmailChange,
             placeholder = "student@university.edu",
-            keyboardType = KeyboardType.Email
+            keyboardType = KeyboardType.Email,
+            isError = isInvalidCredentials
         )
         Spacer(modifier = Modifier.height(18.dp))
 
@@ -471,7 +506,8 @@ private fun AuthFormBody(
             keyboardType = KeyboardType.Password,
             isPassword = true,
             passwordVisible = passwordVisible,
-            onPasswordVisibilityChanged = onPasswordVisibilityChanged
+            onPasswordVisibilityChanged = onPasswordVisibilityChanged,
+            isError = isInvalidCredentials
         )
         Spacer(modifier = Modifier.height(18.dp))
 
@@ -629,12 +665,14 @@ private fun OutlinedAuthField(
     keyboardType: KeyboardType,
     isPassword: Boolean = false,
     passwordVisible: Boolean = false,
-    onPasswordVisibilityChanged: (() -> Unit)? = null
+    onPasswordVisibilityChanged: (() -> Unit)? = null,
+    isError: Boolean = false
 ) {
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
         modifier = Modifier.fillMaxWidth(),
+        isError = isError,
         placeholder = {
             Text(
                 text = placeholder,
