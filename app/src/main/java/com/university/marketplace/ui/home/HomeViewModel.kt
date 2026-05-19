@@ -18,6 +18,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import kotlin.math.max
 
@@ -61,6 +63,7 @@ class HomeViewModel(
         observeListings()
         observeSearch()
         loadListings()
+        observeLocationUpdates()
         
         // Use a default location for immediate UI feedback (Bogotá center)
         userLocation = Location("default").apply {
@@ -80,13 +83,25 @@ class HomeViewModel(
             }
             
             if (loc != null) {
-                userLocation = Location("user").apply {
-                    latitude = loc.latitude
-                    longitude = loc.longitude
-                }
-                applyFiltersAndPublish()
+                updateUserLocation(loc.latitude, loc.longitude)
             }
         }
+    }
+
+    private fun observeLocationUpdates() {
+        locationRepository.getLocationUpdates()
+            .onEach { loc ->
+                updateUserLocation(loc.latitude, loc.longitude)
+            }
+            .launchIn(viewModelScope)
+    }
+
+    private fun updateUserLocation(latitude: Double, longitude: Double) {
+        userLocation = Location("user").apply {
+            this.latitude = latitude
+            this.longitude = longitude
+        }
+        applyFiltersAndPublish()
     }
 
     private fun loadCategories() {
