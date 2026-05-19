@@ -95,6 +95,7 @@ fun HomeMarketplaceScreen(
     val categories by viewModel.categories.collectAsState()
     val selectedCategoryId by viewModel.selectedCategoryId.collectAsState()
     val selectedPriceCap by viewModel.selectedPriceCap.collectAsState()
+    val selectedLocationSort by viewModel.selectedLocationSort.collectAsState()
     val isLandscape = LocalConfiguration.current.screenWidthDp > LocalConfiguration.current.screenHeightDp
     val offlineBannerController = rememberOfflineBannerController(isOnline)
 
@@ -160,9 +161,11 @@ fun HomeMarketplaceScreen(
                 categories = categories,
                 selectedCategoryId = selectedCategoryId,
                 selectedPriceCap = selectedPriceCap,
+                selectedLocationSort = selectedLocationSort,
                 onQueryChanged = viewModel::onSearchQueryChanged,
                 onCategorySelected = viewModel::onCategorySelected,
                 onPriceSelected = viewModel::onPriceCapSelected,
+                onLocationSortSelected = viewModel::onLocationSortSelected,
                 onNavigateToFavorites = onNavigateToFavorites
             )
 
@@ -237,9 +240,11 @@ private fun SearchHeader(
     categories: List<Category>,
     selectedCategoryId: String?,
     selectedPriceCap: Int?,
+    selectedLocationSort: LocationSortOption,
     onQueryChanged: (String) -> Unit,
     onCategorySelected: (String?) -> Unit,
     onPriceSelected: (Int?) -> Unit,
+    onLocationSortSelected: (LocationSortOption) -> Unit,
     onNavigateToFavorites: () -> Unit
 ) {
     val priceOptions = listOf<Int?>(null, 100_000, 300_000, 500_000, 1_000_000)
@@ -302,6 +307,13 @@ private fun SearchHeader(
             contentPadding = PaddingValues(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
             item {
                 FilterChip(
                     selected = selectedCategoryId == null,
@@ -318,6 +330,46 @@ private fun SearchHeader(
                     selected = selectedCategoryId == category.id,
                     onClick = { onCategorySelected(category.id) },
                     label = { Text(category.name) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = MarketplaceWhite,
+                        containerColor = Color.White.copy(alpha = 0.65f)
+                    )
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            item {
+                FilterChip(
+                    selected = selectedLocationSort == LocationSortOption.NONE,
+                    onClick = { onLocationSortSelected(LocationSortOption.NONE) },
+                    label = { Text("Relevancia") },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = MarketplaceWhite,
+                        containerColor = Color.White.copy(alpha = 0.65f)
+                    )
+                )
+            }
+            item {
+                FilterChip(
+                    selected = selectedLocationSort == LocationSortOption.NEAREST,
+                    onClick = { onLocationSortSelected(LocationSortOption.NEAREST) },
+                    label = { Text("Más cercanos") },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = MarketplaceWhite,
+                        containerColor = Color.White.copy(alpha = 0.65f)
+                    )
+                )
+            }
+            item {
+                FilterChip(
+                    selected = selectedLocationSort == LocationSortOption.FARTHEST,
+                    onClick = { onLocationSortSelected(LocationSortOption.FARTHEST) },
+                    label = { Text("Más lejanos") },
                     colors = FilterChipDefaults.filterChipColors(
                         selectedContainerColor = MarketplaceWhite,
                         containerColor = Color.White.copy(alpha = 0.65f)
