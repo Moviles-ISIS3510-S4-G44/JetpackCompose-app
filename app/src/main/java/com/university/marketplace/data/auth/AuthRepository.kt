@@ -16,6 +16,7 @@ interface AuthRepository {
     suspend fun getCurrentUser(): AuthenticatedUser
     suspend fun logout()
     suspend fun refreshAccessToken(): String
+    fun getCurrentUserId(): String?
     fun hasActiveSession(): Boolean
     fun clearSession()
 }
@@ -143,6 +144,8 @@ class DefaultAuthRepository(
         sessionStorage.updateTokens(newSession)
         newSession.accessToken
     }
+
+    override fun getCurrentUserId(): String? = sessionStorage.getCurrentUserId()
 
     override fun hasActiveSession(): Boolean = !sessionStorage.getAccessToken().isNullOrBlank()
 

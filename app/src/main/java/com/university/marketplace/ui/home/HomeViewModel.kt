@@ -3,6 +3,9 @@ package com.university.marketplace.ui.home
 import android.location.Location
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.university.marketplace.data.InteractionsRepository
+import com.university.marketplace.data.NotificationRepository
+import com.university.marketplace.data.auth.AuthRepository
 import com.university.marketplace.data.location.LocationRepository
 import com.university.marketplace.data.toUserFriendlyMessage
 import com.university.marketplace.domain.Category
@@ -16,6 +19,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.launchIn
@@ -29,7 +33,10 @@ class HomeViewModel(
     @Suppress("UNUSED_PARAMETER")
     private val getFilteredListingsUseCase: GetFilteredListingsUseCase,
     private val categoryRepository: CategoryRepository,
-    private val locationRepository: LocationRepository
+    private val locationRepository: LocationRepository,
+    private val interactionsRepository: InteractionsRepository,
+    private val authRepository: AuthRepository,
+    private val notificationRepository: NotificationRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<HomeUiState>(HomeUiState.Loading)
@@ -50,28 +57,50 @@ class HomeViewModel(
     private val _selectedLocationSort = MutableStateFlow(LocationSortOption.NONE)
     val selectedLocationSort: StateFlow<LocationSortOption> = _selectedLocationSort.asStateFlow()
 
+    private val _unreadNotificationsCount = MutableStateFlow(0)
+
     private var allListings: List<Listing> = emptyList()
     private var currentSearchResults: List<Listing>? = null
     private var searchJob: Job? = null
     private var userLocation: Location? = null
-
-    private val listingInterestWeights = mutableMapOf<String, Float>()
-    private val categoryInterestWeights = mutableMapOf<String, Float>()
+    private var recommendedCategoryName: String? = null
+    private var recommendedCategoryId: String? = null
 
     init {
         loadCategories()
-        observeListings()
-        observeSearch()
-        loadListings()
+        loadTopInteractionAndListings()
         observeLocationUpdates()
+        observeNotifications()
         
-        // Use a default location for immediate UI feedback (Bogotá center)
         userLocation = Location("default").apply {
             latitude = 4.601
             longitude = -74.065
         }
         
         refreshUserLocation()
+    }
+
+    private fun observeNotifications() {
+        notificationRepository.unreadCount
+            .onEach { count ->
+                _unreadNotificationsCount.value = count
+                applyFiltersAndPublish()
+            }
+            .launchIn(viewModelScope)
+    }
+
+    private fun loadTopInteractionAndListings() {
+        viewModelScope.launch {
+            val userId = authRepository.getCurrentUserId()
+            if (userId != null) {
+                val topInteraction = interactionsRepository.getTopInteraction(userId)
+                recommendedCategoryName = topInteraction?.categoryName
+                recommendedCategoryId = topInteraction?.categoryId
+            }
+            observeListings()
+            observeSearch()
+            loadListings()
+        }
     }
 
     fun refreshUserLocation() {
@@ -189,10 +218,7 @@ class HomeViewModel(
     }
 
     fun onListingOpened(listing: ListingUiModel) {
-        listingInterestWeights[listing.id] = (listingInterestWeights[listing.id] ?: 0f) + 1.5f
-        val normalizedCategory = listing.category.trim().lowercase()
-        categoryInterestWeights[normalizedCategory] =
-            (categoryInterestWeights[normalizedCategory] ?: 0f) + 0.7f
+        // Local behavior tracking (optional enhancement)
     }
 
     private fun applyFiltersAndPublish() {
@@ -214,10 +240,21 @@ class HomeViewModel(
         val processed = when (sortOption) {
             LocationSortOption.NEAREST -> sortByDistance(filtered, nearest = true)
             LocationSortOption.FARTHEST -> sortByDistance(filtered, nearest = false)
-            LocationSortOption.NONE -> applyUserBehaviorWeights(filtered)
+            LocationSortOption.NONE -> filtered // Can apply local weights here if desired
         }
 
-        updateSections(processed.map { it.toUiModel(userLocation) })
+        val recommended = if (recommendedCategoryId != null && !isSearching()) {
+            allListings.filter { it.categoryId == recommendedCategoryId }.take(5)
+        } else emptyList()
+
+        updateSections(
+            listings = processed.map { it.toUiModel(userLocation) },
+            recommended = recommended.map { it.toUiModel(userLocation) }
+        )
+    }
+
+    private fun isSearching(): Boolean {
+        return _searchQuery.value.isNotEmpty() || _selectedCategoryId.value != null || _selectedPriceCap.value != null || _selectedLocationSort.value != LocationSortOption.NONE
     }
 
     private fun sortByDistance(listings: List<Listing>, nearest: Boolean): List<Listing> {
@@ -238,27 +275,19 @@ class HomeViewModel(
         return currentLoc.distanceTo(dest)
     }
 
-    private fun applyUserBehaviorWeights(listings: List<Listing>): List<Listing> {
-        if (listings.isEmpty()) return emptyList()
-        return listings.sortedByDescending { listing ->
-            val byListing = (listingInterestWeights[listing.id] ?: 0f).toDouble()
-            val byCategory = (categoryInterestWeights[listing.categoryId.trim().lowercase()] ?: 0f).toDouble()
-            val priceBoost = max(0.0, 1.0 - (listing.price / 10000000.0))
-            byListing + byCategory + (priceBoost * 0.05)
-        }
-    }
-
-    private fun updateSections(listings: List<ListingUiModel>) {
-        val isFiltering = _searchQuery.value.isNotEmpty() || _selectedCategoryId.value != null || _selectedPriceCap.value != null || _selectedLocationSort.value != LocationSortOption.NONE
+    private fun updateSections(listings: List<ListingUiModel>, recommended: List<ListingUiModel>) {
         val featured = listings.take(4)
         val recent = listings.drop(4)
         _uiState.value = HomeUiState.Success(
             featured = featured,
             recent = recent,
-            isSearching = isFiltering,
+            recommended = recommended,
+            recommendedCategoryName = recommendedCategoryName,
+            isSearching = isSearching(),
             selectedCategory = _selectedCategoryId.value ?: "Todo",
             selectedPriceCap = _selectedPriceCap.value,
-            selectedLocationSort = _selectedLocationSort.value
+            selectedLocationSort = _selectedLocationSort.value,
+            unreadNotificationsCount = _unreadNotificationsCount.value
         )
     }
 }

@@ -4,11 +4,13 @@ import android.util.Log
 import com.university.marketplace.data.api.InteractionRequestDto
 import com.university.marketplace.data.api.InteractionsApi
 import com.university.marketplace.data.api.NetworkModule
+import com.university.marketplace.data.api.TopInteractionDto
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 interface InteractionsRepository {
     suspend fun registerVisit(listingId: String)
+    suspend fun getTopInteraction(userId: String): TopInteractionDto?
 }
 
 class DefaultInteractionsRepository(
@@ -28,6 +30,22 @@ class DefaultInteractionsRepository(
                 }
             } catch (error: Throwable) {
                 Log.w(TAG, "Interaction register threw for listing $listingId", error)
+            }
+        }
+    }
+
+    override suspend fun getTopInteraction(userId: String): TopInteractionDto? {
+        return withContext(Dispatchers.IO) {
+            try {
+                val response = api.getTopInteractions(userId)
+                if (response.isSuccessful) {
+                    response.body()
+                } else {
+                    null
+                }
+            } catch (error: Throwable) {
+                Log.e(TAG, "Error getting top interaction for user $userId", error)
+                null
             }
         }
     }

@@ -104,7 +104,7 @@ fun AppNavigation(container: com.university.marketplace.di.AppContainer) {
     val factory = remember(container, authRepository) { MarketplaceViewModelFactory(container, authRepository) }
     val coroutineScope = rememberCoroutineScope()
     val startDestination = if (authRepository.hasActiveSession()) "home" else "sign_in"
-    
+
     val goToSignIn: () -> Unit = {
         navController.navigate("sign_in") {
             popUpTo(0) { inclusive = true }
@@ -113,7 +113,7 @@ fun AppNavigation(container: com.university.marketplace.di.AppContainer) {
     }
 
     var uiMessage by rememberSaveable { mutableStateOf<String?>(null) }
-    
+
     LaunchedEffect(session) {
         if (session == null) {
             val currentRoute = navController.currentDestination?.route
@@ -123,11 +123,11 @@ fun AppNavigation(container: com.university.marketplace.di.AppContainer) {
             }
         }
     }
-    
+
     val onUnauthorized: () -> Unit = {
         authRepository.clearSession()
     }
-    
+
     val onLogout: () -> Unit = {
         coroutineScope.launch {
             runCatching { authRepository.logout() }
@@ -341,7 +341,7 @@ fun AppNavigation(container: com.university.marketplace.di.AppContainer) {
             val sellerId = backStackEntry.arguments?.getString("sellerId") ?: ""
             val sellerName = backStackEntry.arguments?.getString("sellerName") ?: ""
             val otherUserProfileViewModel: OtherUserProfileViewModel = viewModel(factory = factory)
-            
+
             OtherUserProfileScreen(
                 sellerId = sellerId,
                 sellerName = sellerName,
@@ -394,7 +394,7 @@ fun AppNavigation(container: com.university.marketplace.di.AppContainer) {
         ) { backStackEntry ->
             val conversationId = backStackEntry.arguments?.getString("conversationId") ?: ""
             val otherUserName = backStackEntry.arguments?.getString("name") ?: ""
-            
+
             val chatViewModel: ChatViewModel = viewModel(
                 factory = ChatViewModelFactory(
                     chatRepository = container.chatRepository,
