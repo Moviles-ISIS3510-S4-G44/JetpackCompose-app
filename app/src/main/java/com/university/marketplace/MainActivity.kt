@@ -65,6 +65,8 @@ import com.university.marketplace.ui.chat.ChatViewModel
 import com.university.marketplace.ui.chat.ChatViewModelFactory
 import com.university.marketplace.ui.chat.ConversationListScreen
 import com.university.marketplace.ui.chat.ConversationListViewModel
+import com.university.marketplace.ui.notifications.NotificationsScreen
+import com.university.marketplace.ui.notifications.NotificationsViewModel
 import com.university.marketplace.ui.purchases.PurchaseHistoryScreen
 import com.university.marketplace.ui.purchases.PurchaseHistoryViewModel
 import com.university.marketplace.ui.purchases.SalesHistoryScreen
@@ -248,7 +250,17 @@ fun AppNavigation(container: com.university.marketplace.di.AppContainer) {
                 onNavigateToFavorites = {
                     navController.navigate("favorites")
                 },
+                onNavigateToNotifications = {
+                    navController.navigate("notifications")
+                },
                 isOnline = isOnline
+            )
+        }
+        composable("notifications") {
+            val notificationsViewModel: NotificationsViewModel = viewModel(factory = factory)
+            NotificationsScreen(
+                onBack = { navController.popBackStack() },
+                viewModel = notificationsViewModel
             )
         }
         composable("profile") {

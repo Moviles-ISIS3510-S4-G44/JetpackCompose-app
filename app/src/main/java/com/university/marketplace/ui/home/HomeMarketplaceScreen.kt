@@ -66,8 +66,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -80,7 +78,6 @@ import com.university.marketplace.ui.theme.MarketplaceDark
 import com.university.marketplace.ui.theme.MarketplaceWhite
 import com.university.marketplace.ui.theme.MarketplaceYellow
 import java.util.Locale
-
 
 @Composable
 fun HomeMarketplaceScreen(
@@ -160,7 +157,8 @@ fun HomeMarketplaceScreen(
                 message = "Sin conexion. Algunas funciones pueden no estar disponibles."
             )
 
-            val unreadCount = (uiState as? HomeUiState.Success)?.unreadNotificationsCount ?: 0
+            val successState = uiState as? HomeUiState.Success
+            val unreadCount = successState?.unreadNotificationsCount ?: 0
 
             SearchHeader(
                 searchQuery = searchQuery,
@@ -219,6 +217,21 @@ fun HomeMarketplaceScreen(
                                 }
                             }
                         } else {
+
+                            if (state.recommended.isNotEmpty()) {
+                                item {
+                                    SectionTitle("Basado en tu interés en ${state.recommendedCategoryName}")
+                                    LazyRow(
+                                        contentPadding = PaddingValues(horizontal = 16.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                                    ) {
+                                        items(state.recommended, key = { it.id }) { listing ->
+                                            FeaturedProductCard(listing = listing, onClick = { onListingClick(listing) })
+                                        }
+                                    }
+                                }
+                            }
+
                             item {
                                 SectionTitle("Destacados")
                                 LazyRow(
@@ -308,7 +321,10 @@ private fun SearchHeader(
             IconButton(onClick = onNavigateToFavorites, modifier = Modifier.size(48.dp)) {
                 Icon(Icons.Default.Favorite, contentDescription = "Favoritos", tint = MarketplaceDark)
             }
-            IconButton(onClick = onNavigateToNotifications, modifier = Modifier.size(48.dp)) {
+            IconButton(
+                onClick = { onNavigateToNotifications() }, 
+                modifier = Modifier.size(48.dp)
+            ) {
                 BadgedBox(
                     badge = {
                         if (unreadNotificationsCount > 0) {
@@ -318,7 +334,11 @@ private fun SearchHeader(
                         }
                     }
                 ) {
-                    Icon(Icons.Default.Notifications, contentDescription = "Notificaciones", tint = MarketplaceDark)
+                    Icon(
+                        Icons.Default.Notifications, 
+                        contentDescription = "Notificaciones", 
+                        tint = MarketplaceDark
+                    )
                 }
             }
         }

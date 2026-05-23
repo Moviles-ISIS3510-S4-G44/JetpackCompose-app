@@ -55,7 +55,8 @@ class MarketplaceViewModelFactory(
                 CreateListingViewModel(
                     listingRepository = container.listingRepository,
                     categoryRepository = container.categoryRepository,
-                    authRepository = authRepository
+                    authRepository = authRepository,
+                    notificationRepository = container.notificationRepository
                 ) as T
             }
             modelClass.isAssignableFrom(MyListingsViewModel::class.java) -> {

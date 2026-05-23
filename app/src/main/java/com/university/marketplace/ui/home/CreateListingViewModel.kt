@@ -2,6 +2,7 @@ package com.university.marketplace.ui.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.university.marketplace.data.NotificationRepository
 import com.university.marketplace.data.auth.AuthRepository
 import com.university.marketplace.data.toUserFriendlyMessage
 import com.university.marketplace.domain.Category
@@ -23,7 +24,8 @@ sealed interface CreateListingUiState {
 class CreateListingViewModel(
     private val listingRepository: ListingRepository,
     private val categoryRepository: CategoryRepository,
-    private val authRepository: AuthRepository
+    private val authRepository: AuthRepository,
+    private val notificationRepository: NotificationRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<CreateListingUiState>(CreateListingUiState.Idle)
@@ -69,6 +71,13 @@ class CreateListingViewModel(
                     images = images,
                     location = location
                 )
+                
+
+                notificationRepository.insertNotification(
+                    message = "Has publicado con éxito: ${listing.title}",
+                    type = "SYSTEM"
+                )
+
                 _uiState.value = CreateListingUiState.Success(listing)
             } catch (e: Exception) {
                 _uiState.value = CreateListingUiState.Error(
