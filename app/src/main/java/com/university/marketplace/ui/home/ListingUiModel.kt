@@ -1,5 +1,8 @@
 package com.university.marketplace.ui.home
 
+import androidx.compose.runtime.Immutable
+
+@Immutable
 data class ListingUiModel(
     val id: String,
     val sellerId: String,

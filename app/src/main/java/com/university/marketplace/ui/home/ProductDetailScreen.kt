@@ -57,6 +57,10 @@ fun ProductDetailScreen(
     val purchaseState by viewModel.purchaseState.collectAsState()
     val context = LocalContext.current
 
+    val onFavoriteClick = remember(productId) {
+        { viewModel.toggleFavorite(productId) }
+    }
+
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
     ) { results ->
@@ -149,13 +153,16 @@ fun ProductDetailScreen(
                 },
                 actions = {
                     IconButton(onClick = { /* Compartir */ }) { Icon(Icons.Outlined.Share, null) }
-                    IconButton(onClick = { viewModel.toggleFavorite(productId) }) {
+                    IconButton(onClick = onFavoriteClick) {
                         Icon(
                             imageVector = if (uiState.isFavorited) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
                             contentDescription = "Toggle Favorite",
                             tint = if (uiState.isFavorited) Color.Red else LocalContentColor.current
                         )
                     }
+
+
+
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White)
             )
