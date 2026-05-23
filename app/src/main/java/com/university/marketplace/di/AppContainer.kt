@@ -7,6 +7,7 @@ import com.university.marketplace.data.DefaultInteractionsRepository
 import com.university.marketplace.data.InteractionsRepository
 import com.university.marketplace.data.FavoriteRepositoryImpl
 import com.university.marketplace.data.ListingsRepository
+import com.university.marketplace.data.NotificationRepository
 import com.university.marketplace.data.PurchasesRepository
 import com.university.marketplace.data.api.NetworkModule
 import com.university.marketplace.data.auth.AuthRepository
@@ -38,6 +39,7 @@ interface AppContainer {
     val interactionsRepository: InteractionsRepository
     val chatRepository: ChatRepository
     val locationRepository: LocationRepository
+    val notificationRepository: NotificationRepository
     val getActiveListingsUseCase: GetActiveListingsUseCase
     val getListingByIdUseCase: GetListingByIdUseCase
     val getListingsBySellerUseCase: GetListingsBySellerUseCase
@@ -64,6 +66,10 @@ class DefaultAppContainer(context: Context) : AppContainer {
         AndroidLocationRepository(context)
     }
 
+    override val notificationRepository: NotificationRepository by lazy {
+        NotificationRepository(database.notificationDao())
+    }
+
     override val listingRepository: ListingRepository by lazy {
         ListingsRepository(
             api = NetworkModule.listingsApi,
@@ -78,6 +84,7 @@ class DefaultAppContainer(context: Context) : AppContainer {
             favoriteDao = database.favoriteDao(),
             listingDao = database.listingDao(),
             favoriteActionDao = database.favoriteActionDao(),
+            notificationRepository = notificationRepository,
             semanticSearchEngine = semanticSearchEngine,
             context = context
         )
@@ -116,7 +123,10 @@ class DefaultAppContainer(context: Context) : AppContainer {
     }
 
     override val purchaseRepository: PurchaseRepository by lazy {
-        PurchasesRepository(api = NetworkModule.purchasesApi)
+        PurchasesRepository(
+            api = NetworkModule.purchasesApi,
+            notificationRepository = notificationRepository
+        )
     }
 
     override val createPurchaseUseCase: CreatePurchaseUseCase by lazy {

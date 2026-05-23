@@ -18,6 +18,7 @@ class FavoriteRepositoryImpl(
     private val favoriteDao: FavoriteDao,
     private val listingDao: ListingDao,
     private val favoriteActionDao: FavoriteActionDao,
+    private val notificationRepository: NotificationRepository,
     private val semanticSearchEngine: SemanticSearchEngine,
     private val context: Context
 ) : FavoriteRepository {
@@ -37,6 +38,15 @@ class FavoriteRepositoryImpl(
             } else {
                 favoriteDao.insertFavorite(FavoriteEntity(listingId))
                 favoriteActionDao.insertAction(FavoriteActionEntity(listingId = listingId, action = "ADD"))
+                
+                // Add notification
+                val listing = listingDao.getListingById(listingId)
+                val message = if (listing != null) {
+                    "Has añadido '${listing.title}' a tus favoritos"
+                } else {
+                    "Has añadido un producto a tus favoritos"
+                }
+                notificationRepository.insertNotification(message, "FAVORITE")
             }
             scheduleSync()
         }

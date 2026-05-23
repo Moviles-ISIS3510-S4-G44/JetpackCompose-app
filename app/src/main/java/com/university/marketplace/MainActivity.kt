@@ -65,6 +65,8 @@ import com.university.marketplace.ui.chat.ChatViewModel
 import com.university.marketplace.ui.chat.ChatViewModelFactory
 import com.university.marketplace.ui.chat.ConversationListScreen
 import com.university.marketplace.ui.chat.ConversationListViewModel
+import com.university.marketplace.ui.notifications.NotificationsScreen
+import com.university.marketplace.ui.notifications.NotificationsViewModel
 import com.university.marketplace.ui.purchases.PurchaseHistoryScreen
 import com.university.marketplace.ui.purchases.PurchaseHistoryViewModel
 import com.university.marketplace.ui.purchases.SalesHistoryScreen
@@ -104,7 +106,7 @@ fun AppNavigation(container: com.university.marketplace.di.AppContainer) {
     val factory = remember(container, authRepository) { MarketplaceViewModelFactory(container, authRepository) }
     val coroutineScope = rememberCoroutineScope()
     val startDestination = if (authRepository.hasActiveSession()) "home" else "sign_in"
-    
+
     val goToSignIn: () -> Unit = {
         navController.navigate("sign_in") {
             popUpTo(0) { inclusive = true }
@@ -113,7 +115,7 @@ fun AppNavigation(container: com.university.marketplace.di.AppContainer) {
     }
 
     var uiMessage by rememberSaveable { mutableStateOf<String?>(null) }
-    
+
     LaunchedEffect(session) {
         if (session == null) {
             val currentRoute = navController.currentDestination?.route
@@ -123,11 +125,11 @@ fun AppNavigation(container: com.university.marketplace.di.AppContainer) {
             }
         }
     }
-    
+
     val onUnauthorized: () -> Unit = {
         authRepository.clearSession()
     }
-    
+
     val onLogout: () -> Unit = {
         coroutineScope.launch {
             runCatching { authRepository.logout() }
@@ -248,7 +250,17 @@ fun AppNavigation(container: com.university.marketplace.di.AppContainer) {
                 onNavigateToFavorites = {
                     navController.navigate("favorites")
                 },
+                onNavigateToNotifications = {
+                    navController.navigate("notifications")
+                },
                 isOnline = isOnline
+            )
+        }
+        composable("notifications") {
+            val notificationsViewModel: NotificationsViewModel = viewModel(factory = factory)
+            NotificationsScreen(
+                onBack = { navController.popBackStack() },
+                viewModel = notificationsViewModel
             )
         }
         composable("profile") {
@@ -341,7 +353,7 @@ fun AppNavigation(container: com.university.marketplace.di.AppContainer) {
             val sellerId = backStackEntry.arguments?.getString("sellerId") ?: ""
             val sellerName = backStackEntry.arguments?.getString("sellerName") ?: ""
             val otherUserProfileViewModel: OtherUserProfileViewModel = viewModel(factory = factory)
-            
+
             OtherUserProfileScreen(
                 sellerId = sellerId,
                 sellerName = sellerName,
@@ -394,7 +406,7 @@ fun AppNavigation(container: com.university.marketplace.di.AppContainer) {
         ) { backStackEntry ->
             val conversationId = backStackEntry.arguments?.getString("conversationId") ?: ""
             val otherUserName = backStackEntry.arguments?.getString("name") ?: ""
-            
+
             val chatViewModel: ChatViewModel = viewModel(
                 factory = ChatViewModelFactory(
                     chatRepository = container.chatRepository,

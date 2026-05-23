@@ -35,6 +35,8 @@ import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.PersonOutline
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -75,7 +77,6 @@ import com.university.marketplace.ui.common.rememberOfflineBannerController
 import com.university.marketplace.ui.theme.MarketplaceDark
 import com.university.marketplace.ui.theme.MarketplaceWhite
 import com.university.marketplace.ui.theme.MarketplaceYellow
-import androidx.compose.material.icons.filled.LocationOn
 import java.util.Locale
 
 @Composable
@@ -86,6 +87,7 @@ fun HomeMarketplaceScreen(
     onNavigateToPurchases: () -> Unit = {},
     onNavigateToMessages: () -> Unit = {},
     onNavigateToFavorites: () -> Unit = {},
+    onNavigateToNotifications: () -> Unit = {},
     isOnline: Boolean,
     viewModel: HomeViewModel
 ) {
@@ -155,6 +157,9 @@ fun HomeMarketplaceScreen(
                 message = "Sin conexion. Algunas funciones pueden no estar disponibles."
             )
 
+            val successState = uiState as? HomeUiState.Success
+            val unreadCount = successState?.unreadNotificationsCount ?: 0
+
             SearchHeader(
                 searchQuery = searchQuery,
                 isOnline = isOnline,
@@ -162,11 +167,13 @@ fun HomeMarketplaceScreen(
                 selectedCategoryId = selectedCategoryId,
                 selectedPriceCap = selectedPriceCap,
                 selectedLocationSort = selectedLocationSort,
+                unreadNotificationsCount = unreadCount,
                 onQueryChanged = viewModel::onSearchQueryChanged,
                 onCategorySelected = viewModel::onCategorySelected,
                 onPriceSelected = viewModel::onPriceCapSelected,
                 onLocationSortSelected = viewModel::onLocationSortSelected,
-                onNavigateToFavorites = onNavigateToFavorites
+                onNavigateToFavorites = onNavigateToFavorites,
+                onNavigateToNotifications = onNavigateToNotifications
             )
 
             when (val state = uiState) {
@@ -210,6 +217,21 @@ fun HomeMarketplaceScreen(
                                 }
                             }
                         } else {
+
+                            if (state.recommended.isNotEmpty()) {
+                                item {
+                                    SectionTitle("Basado en tu interés en ${state.recommendedCategoryName}")
+                                    LazyRow(
+                                        contentPadding = PaddingValues(horizontal = 16.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                                    ) {
+                                        items(state.recommended, key = { it.id }) { listing ->
+                                            FeaturedProductCard(listing = listing, onClick = { onListingClick(listing) })
+                                        }
+                                    }
+                                }
+                            }
+
                             item {
                                 SectionTitle("Destacados")
                                 LazyRow(
@@ -241,11 +263,13 @@ private fun SearchHeader(
     selectedCategoryId: String?,
     selectedPriceCap: Int?,
     selectedLocationSort: LocationSortOption,
+    unreadNotificationsCount: Int,
     onQueryChanged: (String) -> Unit,
     onCategorySelected: (String?) -> Unit,
     onPriceSelected: (Int?) -> Unit,
     onLocationSortSelected: (LocationSortOption) -> Unit,
-    onNavigateToFavorites: () -> Unit
+    onNavigateToFavorites: () -> Unit,
+    onNavigateToNotifications: () -> Unit
 ) {
     val priceOptions = listOf<Int?>(null, 100_000, 300_000, 500_000, 1_000_000)
 
@@ -297,8 +321,25 @@ private fun SearchHeader(
             IconButton(onClick = onNavigateToFavorites, modifier = Modifier.size(48.dp)) {
                 Icon(Icons.Default.Favorite, contentDescription = "Favoritos", tint = MarketplaceDark)
             }
-            IconButton(onClick = { }, modifier = Modifier.size(48.dp)) {
-                Icon(Icons.Default.Notifications, contentDescription = "Notificaciones", tint = MarketplaceDark)
+            IconButton(
+                onClick = { onNavigateToNotifications() }, 
+                modifier = Modifier.size(48.dp)
+            ) {
+                BadgedBox(
+                    badge = {
+                        if (unreadNotificationsCount > 0) {
+                            Badge {
+                                Text(unreadNotificationsCount.toString())
+                            }
+                        }
+                    }
+                ) {
+                    Icon(
+                        Icons.Default.Notifications, 
+                        contentDescription = "Notificaciones", 
+                        tint = MarketplaceDark
+                    )
+                }
             }
         }
 

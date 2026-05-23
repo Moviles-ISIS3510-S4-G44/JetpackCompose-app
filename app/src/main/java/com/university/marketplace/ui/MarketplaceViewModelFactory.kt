@@ -12,6 +12,7 @@ import com.university.marketplace.ui.profile.MyListingsViewModel
 import com.university.marketplace.ui.profile.OtherUserProfileViewModel
 import com.university.marketplace.ui.chat.ConversationListViewModel
 import com.university.marketplace.ui.favorites.FavoritesViewModel
+import com.university.marketplace.ui.notifications.NotificationsViewModel
 import com.university.marketplace.ui.purchases.PurchaseHistoryViewModel
 import com.university.marketplace.ui.purchases.SalesHistoryViewModel
 
@@ -29,7 +30,10 @@ class MarketplaceViewModelFactory(
                     searchListingsByRelevanceUseCase = container.searchListingsByRelevanceUseCase,
                     getFilteredListingsUseCase = container.getFilteredListingsUseCase,
                     categoryRepository = container.categoryRepository,
-                    locationRepository = container.locationRepository
+                    locationRepository = container.locationRepository,
+                    interactionsRepository = container.interactionsRepository,
+                    authRepository = authRepository,
+                    notificationRepository = container.notificationRepository
                 ) as T
             }
             modelClass.isAssignableFrom(ListingDetailViewModel::class.java) -> {
@@ -51,7 +55,8 @@ class MarketplaceViewModelFactory(
                 CreateListingViewModel(
                     listingRepository = container.listingRepository,
                     categoryRepository = container.categoryRepository,
-                    authRepository = authRepository
+                    authRepository = authRepository,
+                    notificationRepository = container.notificationRepository
                 ) as T
             }
             modelClass.isAssignableFrom(MyListingsViewModel::class.java) -> {
@@ -83,6 +88,11 @@ class MarketplaceViewModelFactory(
                     favoriteRepository = container.favoriteRepository,
                     listingRepository = container.listingRepository,
                     locationRepository = container.locationRepository
+                ) as T
+            }
+            modelClass.isAssignableFrom(NotificationsViewModel::class.java) -> {
+                NotificationsViewModel(
+                    notificationRepository = container.notificationRepository
                 ) as T
             }
             else -> throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
